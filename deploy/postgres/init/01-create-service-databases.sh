@@ -8,9 +8,24 @@
 #     bash /docker-entrypoint-initdb.d/01-create-service-databases.sh
 #
 # Passwords come only from the environment (<SERVICE>_DB_PASSWORD), never from this file.
+# psql reads them itself with \getenv, so they never appear on a command line (process list).
 set -euo pipefail
 
 SERVICES=(identity restaurant catalog conversation order notification analytics)
+
+# Validate every password before creating anything, so a failed first init cannot leave a
+# half-initialised volume behind.
+missing=()
+for svc in "${SERVICES[@]}"; do
+  password_var="${svc^^}_DB_PASSWORD"
+  if [[ -z "${!password_var:-}" ]]; then
+    missing+=("$password_var")
+  fi
+done
+if (( ${#missing[@]} > 0 )); then
+  echo "init: not set: ${missing[*]}; nothing was created" >&2
+  exit 1
+fi
 
 psql_super() {
   psql --quiet --no-psqlrc --set ON_ERROR_STOP=1 \
@@ -19,21 +34,21 @@ psql_super() {
 
 for svc in "${SERVICES[@]}"; do
   password_var="${svc^^}_DB_PASSWORD"
-  password="${!password_var:-}"
-  if [[ -z "$password" ]]; then
-    echo "init: ${password_var} is not set" >&2
-    exit 1
-  fi
 
-  # Identifiers are always quoted with %I: "order" is a reserved word.
+  # Identifiers are always quoted with %I: "order" is a reserved word. Statement logging is
+  # switched off for this session so the password never reaches the server log.
   psql_super --dbname postgres \
-    --set role="$svc" --set db="${svc}_db" --set pw="$password" <<'SQL'
+    --set role="$svc" --set db="${svc}_db" --set pw_var="$password_var" <<'SQL'
 SET client_min_messages = warning;
+SET log_statement = 'none';
+SET log_min_error_statement = panic;
+\getenv pw :pw_var
 
 SELECT format('CREATE ROLE %I LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE PASSWORD %L',
               :'role', :'pw')
 WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = :'role')
 \gexec
+\unset pw
 
 SELECT format('CREATE DATABASE %I OWNER %I', :'db', :'role')
 WHERE NOT EXISTS (SELECT 1 FROM pg_database WHERE datname = :'db')
