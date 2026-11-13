@@ -181,6 +181,39 @@ guardrails or the technology stack needs a new ADR and the human's approval befo
   in `conftest.py`.
 - **Related:** SAD 12.4, ADR-12, CLAUDE.md rule 3, backlog I1-01.
 
+## ADR-15: Per-member CI pipelines with isolated environments
+
+- **Status:** Accepted, 2026-11-13
+- **Context:** SAD 12.5 asks for a pipeline per service that runs only when that service's
+  folder changes. CLAUDE.md rule 3 forbids cross-service imports, but locally all workspace
+  members share one `.venv`, so a stray import or an undeclared dependency passes on a
+  developer machine (backlog F1-03, F1-06). The repository is public.
+- **Decision:** GitHub Actions. One thin path-filtered workflow per workspace member (seven
+  services, `platform-lib`, `bale-adapter`) calls one reusable workflow that runs ruff format
+  check, ruff check and pytest on that member only (SAD 12.5 steps 1 to 3). Each job builds an
+  isolated environment, `uv sync --locked --package <member>` plus only the locked ruff and
+  pytest closure, so no other workspace member is importable. A member's pipeline is triggered
+  by its own folder and its direct inputs: `libs/platform`, its own OpenAPI contract,
+  `contracts/events`, the root manifest, lock file and Python pin, and the CI definition. A
+  separate `contracts` workflow validates event schemas, examples and OpenAPI documents. A
+  separate light structure-check workflow runs the structural tests on any change under
+  `services`, `adapters`, `libs`, `.github`, `deploy`, `gateway/kong.yml` or `.env.example`;
+  it is accepted that a service change runs its own pipeline plus this check. Actions are
+  pinned to commit SHAs, the uv version is pinned, and workflows use read-only permissions and
+  no secrets.
+- **Alternatives considered:** One workflow with a third-party path-filter action and a matrix
+  (rejected: third-party dependency, less transparent filters). A full root `uv sync` in every
+  job (rejected: hides undeclared dependencies and cross-service imports). Floating action
+  tags (rejected: supply-chain risk in a public repository). Widening the platform pipeline
+  instead of a dedicated structure check (rejected: runs the whole platform pipeline on every
+  service change).
+- **Consequences:** Undeclared dependencies and cross-service imports fail in CI at import
+  time; the import-boundary lint (F1-03) is still needed for code paths tests do not reach.
+  No type checker is in the stack, so step 1 of SAD 12.5 is lint only for now. Steps 4 to 6
+  (image build, Compose integration tests, deploy) are deferred until Dockerfiles exist.
+  "Passes on main" is observable only after a push. Pinned SHAs need periodic updates.
+- **Related:** SAD 12.4, 12.5, ADR-12, ADR-14, CLAUDE.md rule 3, backlog I1-14, F1-03, F1-06.
+
 ---
 
 ## Template for new ADRs

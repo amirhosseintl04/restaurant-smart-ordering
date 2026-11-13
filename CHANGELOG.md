@@ -14,3 +14,7 @@ iteration numbers from the SAD (section 17.1) until the first tagged release.
 - `docs/backlog.md`: iterations 0 to 4, Iteration 1 broken into tasks.
 - Claude Code agent definitions (`implementer`, `reviewer`, `docs-writer`), project settings and a ruff formatting hook.
 - `.gitignore`, `.env.example`, `.python-version` (3.12), MIT `LICENSE`, `README.md`.
+
+### Changed (Iteration 1)
+
+- ADR-15 (per-member CI pipelines with isolated environments) added to `docs/decisions.md` and SAD section 14; SAD 12.5 closing sentence refined.
