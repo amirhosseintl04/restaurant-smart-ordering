@@ -1,0 +1,44 @@
+# CI for the notification service: runs only when its inputs change (SAD 12.5).
+name: notification
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "services/notification/**"
+      - "libs/platform/**"
+      - "contracts/openapi/notification.yaml"
+      - "contracts/events/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".python-version"
+      - ".github/workflows/notification.yml"
+      - ".github/workflows/_member-ci.yml"
+      - ".github/scripts/sync-member.sh"
+  pull_request:
+    paths:
+      - "services/notification/**"
+      - "libs/platform/**"
+      - "contracts/openapi/notification.yaml"
+      - "contracts/events/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".python-version"
+      - ".github/workflows/notification.yml"
+      - ".github/workflows/_member-ci.yml"
+      - ".github/scripts/sync-member.sh"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    uses: ./.github/workflows/_member-ci.yml
+    with:
+      member-path: services/notification
+      package: notification-service

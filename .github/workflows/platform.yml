@@ -1,0 +1,48 @@
+# CI for libs/platform (platform-lib). Besides the library itself it runs the structural
+# workspace test (libs/platform/tests/test_workspace_layout.py), which reads every member's
+# pyproject.toml, so it also runs when any member manifest or the root manifest changes.
+# That test only reads files from the checkout and imports nothing but platform_lib, so the
+# isolated environment of the other members is enough here too.
+name: platform
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "libs/platform/**"
+      - "services/*/pyproject.toml"
+      - "adapters/*/pyproject.toml"
+      - "contracts/events/envelope.schema.json"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".python-version"
+      - ".github/workflows/platform.yml"
+      - ".github/workflows/_member-ci.yml"
+      - ".github/scripts/sync-member.sh"
+  pull_request:
+    paths:
+      - "libs/platform/**"
+      - "services/*/pyproject.toml"
+      - "adapters/*/pyproject.toml"
+      - "contracts/events/envelope.schema.json"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".python-version"
+      - ".github/workflows/platform.yml"
+      - ".github/workflows/_member-ci.yml"
+      - ".github/scripts/sync-member.sh"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    uses: ./.github/workflows/_member-ci.yml
+    with:
+      member-path: libs/platform
+      package: platform-lib

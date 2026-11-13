@@ -1,0 +1,44 @@
+# CI for the order service: runs only when its inputs change (SAD 12.5).
+name: order
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "services/order/**"
+      - "libs/platform/**"
+      - "contracts/openapi/order.yaml"
+      - "contracts/events/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".python-version"
+      - ".github/workflows/order.yml"
+      - ".github/workflows/_member-ci.yml"
+      - ".github/scripts/sync-member.sh"
+  pull_request:
+    paths:
+      - "services/order/**"
+      - "libs/platform/**"
+      - "contracts/openapi/order.yaml"
+      - "contracts/events/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".python-version"
+      - ".github/workflows/order.yml"
+      - ".github/workflows/_member-ci.yml"
+      - ".github/scripts/sync-member.sh"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    uses: ./.github/workflows/_member-ci.yml
+    with:
+      member-path: services/order
+      package: order-service
