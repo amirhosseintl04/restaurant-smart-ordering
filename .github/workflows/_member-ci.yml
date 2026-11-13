@@ -44,15 +44,20 @@ jobs:
         run: uv python install
 
       - name: Sync isolated environment (member, its dependencies, locked dev tools)
+        id: sync
         run: bash .github/scripts/sync-member.sh "$PACKAGE"
 
       - name: Ruff format check
         run: uv run --no-sync ruff format --check "$MEMBER_PATH"
 
+      # Lint and tests run even if the format check failed, so one failure does not hide the
+      # others; they are skipped when the environment could not be built.
       - name: Ruff lint
+        if: ${{ !cancelled() && steps.sync.outcome == 'success' }}
         run: uv run --no-sync ruff check "$MEMBER_PATH"
 
       - name: Unit tests
+        if: ${{ !cancelled() && steps.sync.outcome == 'success' }}
         # Exit code 5 means "no tests collected": acceptable for a member with no tests yet.
         run: |
           set +e

@@ -14,11 +14,16 @@
 # Run the tools afterwards with `uv run --no-sync ...`: a plain `uv run` would re-sync the
 # environment exactly and remove the tools again.
 #
-# Honors UV_PROJECT_ENVIRONMENT (default .venv), so the same script builds a scratch
-# environment locally without touching the developer's shared .venv.
+# Honors UV_PROJECT_ENVIRONMENT (default .venv in CI). Outside CI (CI not "true") it refuses
+# to run without UV_PROJECT_ENVIRONMENT, so it never rewrites the developer's shared .venv.
 set -euo pipefail
 
 package="${1:?usage: sync-member.sh <package-name>}"
+if [ "${CI:-}" != "true" ] && [ -z "${UV_PROJECT_ENVIRONMENT:-}" ]; then
+  echo "error: outside CI this script would rewrite the shared .venv." >&2
+  echo "Set a scratch environment first, e.g. UV_PROJECT_ENVIRONMENT=.venv-$package" >&2
+  exit 2
+fi
 env_dir="${UV_PROJECT_ENVIRONMENT:-.venv}"
 
 # 1. Member plus its declared dependencies; --locked fails if uv.lock is stale.
