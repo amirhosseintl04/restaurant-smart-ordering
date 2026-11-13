@@ -19,6 +19,11 @@ services/<name>/
 └── Dockerfile                # later: one image per service
 ```
 
+The src layout is ADR-14: a package is importable only when installed in the workspace
+environment. Because `tests/` has no `__init__.py` and pytest runs in `importlib` import mode,
+test modules cannot import sibling test modules by bare name; put shared fixtures in a
+`conftest.py` and helpers inside the package.
+
 ## Import rules
 
 - Dependencies point inward: `api` -> `application` -> `domain`.
