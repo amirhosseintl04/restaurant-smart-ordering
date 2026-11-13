@@ -22,7 +22,7 @@ Status legend: `[ ]` open, `[~]` in progress, `[x]` done.
 | ID | Task | Owner | Depends on | Acceptance criteria | Status |
 | --- | --- | --- | --- | --- | --- |
 | I0-01 | Bootstrap project structure and agent workflow (SAD moved, CLAUDE.md, ADR log, backlog, agents, settings, hook, root files) | Lead | — | All files exist, settings JSON valid, one commit `chore: bootstrap project structure and agent workflow` | [x] |
-| I0-02 | Golden set: 50 labeled colloquial Persian order messages (intent, items, quantities) in `docs/ai/golden-set-v0.jsonl` | Human + Lead | — | 50 rows, schema matches SAD 9.3 output, covers all intents of SAD 9.2, Persian digits and typos included | [ ] |
+| I0-02 | Golden set: 50 labeled colloquial Persian order messages (intent, items, quantities). Draft for correction in `docs/ai/golden-set-v0.md`; converted to `docs/ai/golden-set-v0.jsonl` after the author's corrections | Human + Lead | — | 50+ rows, schema matches SAD 9.3 output, covers all intents of SAD 9.2, Persian digits and typos included | [~] |
 | I0-03 | Extraction prototype script (retrieval candidates + structured LLM call) and accuracy report | Lead (fable, high) | I0-02 | Exact-match accuracy reported on the golden set; zero off-menu product IDs; latency per call logged | [ ] |
 | I0-04 | LLM provider and model decision recorded as ADR-13 | Human + Lead | I0-03 | ADR-13 Accepted in `docs/decisions.md` and SAD section 14 | [ ] |
 
