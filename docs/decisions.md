@@ -194,11 +194,15 @@ guardrails or the technology stack needs a new ADR and the human's approval befo
   isolated environment, `uv sync --locked --package <member>` plus only the locked ruff and
   pytest closure, so no other workspace member is importable. A member's pipeline is triggered
   by its own folder and its direct inputs: `libs/platform`, its own OpenAPI contract,
-  `contracts/events`, the root manifest, lock file and Python pin, and the CI definition. A
-  separate `contracts` workflow validates event schemas, examples and OpenAPI documents. A
+  `contracts/events`, the root manifest, lock file and Python pin, and the CI definition. This
+  holds for the seven services; `platform-lib` is triggered only by the envelope and common
+  event schemas (`contracts/events/envelope.schema.json`, `contracts/events/common.schema.json`)
+  and `bale-adapter` by no contract path. A separate `contracts` workflow validates event
+  schemas, examples and OpenAPI documents, checks that every event schema has at least one
+  example, and checks that `contracts/events/registry.json` matches the schema files. A
   separate light structure-check workflow runs the structural tests on any change under
-  `services`, `adapters`, `libs`, `.github`, `deploy`, `gateway/kong.yml` or `.env.example`;
-  it is accepted that a service change runs its own pipeline plus this check. Actions are
+  `services`, `adapters`, `libs`, `.github`, `deploy`, `gateway/kong.yml`, `.env.example` or
+  the root `pyproject.toml`, `uv.lock` and `.python-version`; it is accepted that a service change runs its own pipeline plus this check. Actions are
   pinned to commit SHAs, the uv version is pinned, and workflows use read-only permissions and
   no secrets.
 - **Alternatives considered:** One workflow with a third-party path-filter action and a matrix
