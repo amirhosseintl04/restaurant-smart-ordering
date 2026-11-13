@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+dist/
+build/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.hypothesis/
+htmlcov/
+.coverage
+.coverage.*
+
+# Environment and secrets (public repository: never commit real values)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Claude Code
+.claude/worktrees/
+.claude/settings.local.json
+
+# Docker volumes and local data
+deploy/data/
+pg-data/
+mq-data/
+backups/
+
+# Logs
+*.log
+logs/
+
+# IDE and OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db

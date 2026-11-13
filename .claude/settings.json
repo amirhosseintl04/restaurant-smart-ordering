@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(git *)",
+      "Bash(pytest *)",
+      "Bash(python -m pytest *)",
+      "Bash(ruff *)",
+      "Bash(python -m ruff *)",
+      "Bash(uv sync *)",
+      "Bash(uv lock *)",
+      "Bash(uv run pytest *)",
+      "Bash(uv run ruff *)",
+      "Bash(docker compose *)",
+      "PowerShell(git *)",
+      "PowerShell(pytest *)",
+      "PowerShell(ruff *)",
+      "PowerShell(uv run *)",
+      "PowerShell(uv sync *)",
+      "PowerShell(docker compose *)"
+    ],
+    "ask": [
+      "Bash(git push *)",
+      "Bash(git merge *)",
+      "Bash(git reset --hard *)",
+      "Bash(git clean *)",
+      "PowerShell(git push *)",
+      "PowerShell(git merge *)",
+      "PowerShell(git reset --hard *)",
+      "PowerShell(git clean *)"
+    ],
+    "deny": [
+      "Bash(git push --force*)",
+      "Bash(git push -f*)",
+      "Bash(git push * --force*)",
+      "Bash(git push * -f*)",
+      "PowerShell(git push --force*)",
+      "PowerShell(git push -f*)",
+      "PowerShell(git push * --force*)",
+      "PowerShell(git push * -f*)",
+      "Read(**/.env)",
+      "Read(**/.env.local)",
+      "Read(**/.env.*.local)",
+      "Read(**/*.pem)",
+      "Read(**/*.key)",
+      "Bash(cat .env*)",
+      "Bash(cat */.env*)",
+      "PowerShell(Get-Content .env*)"
+    ]
+  },
+  "worktree": {
+    "baseRef": "head"
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python",
+            "args": ["-I", "${CLAUDE_PROJECT_DIR}/.claude/hooks/ruff_on_edit.py"],
+            "timeout": 60,
+            "statusMessage": "ruff format + check on edited Python file"
+          }
+        ]
+      }
+    ]
+  }
+}
