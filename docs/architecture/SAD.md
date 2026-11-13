@@ -1024,7 +1024,7 @@ restaurant-smart-ordering/
     └── architecture/
 ```
 
-Every service, adapter and library is a uv workspace member with its own `pyproject.toml` and a package in **src layout** (`src/<name>_service/`, ADR-14), so the package is importable only when installed in the workspace environment, never by accident from the working directory. Each service package is internally layered: `api/` (routes and schemas), `application/` (use cases and ports), `domain/` (entities and business rules) and `infrastructure/` (database, broker, external clients); `tests/` sits beside `src/`. The `libs/platform` library (package `platform_lib`, named to avoid shadowing the standard-library `platform` module) contains technical code only; no domain model is shared through it, so no hidden coupling forms between services.
+Every service, adapter and library is a uv workspace member with its own `pyproject.toml` and a package in **src layout** (`src/<name>_service/` for services, `src/bale_adapter/`, `src/platform_lib/`; ADR-14), so the package is importable only when installed in the workspace environment, never by accident from the working directory. Each service package is internally layered: `api/` (routes and schemas), `application/` (use cases and ports), `domain/` (entities and business rules) and `infrastructure/` (database, broker, external clients); `tests/` sits beside `src/`. The `libs/platform` library (package `platform_lib`, named to avoid shadowing the standard-library `platform` module) contains technical code only; no domain model is shared through it, so no hidden coupling forms between services.
 
 ### 12.5. CI/CD Pipeline per Service
 
