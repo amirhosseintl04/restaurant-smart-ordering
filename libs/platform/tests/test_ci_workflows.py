@@ -213,9 +213,20 @@ def test_contract_changes_run_the_contracts_pipeline_and_the_owning_services() -
     assert f"bash {CONTRACTS_SCRIPT} contracts" in _run_lines(_workflow_texts()["contracts.yml"])
 
 
-@pytest.mark.parametrize("changed", ["docs/backlog.md", "README.md", "CLAUDE.md", "deploy/x.yml"])
+def _structure_patterns() -> list[str]:
+    return _trigger_paths(_workflow_texts()["structure.yml"])["push"]
+
+
+@pytest.mark.parametrize("changed", ["docs/backlog.md", "README.md", "CLAUDE.md"])
 def test_changes_outside_ci_inputs_run_no_pipeline(changed: str) -> None:
     assert _triggered(changed) == set()
+    assert not any(_matches(p, changed) for p in _structure_patterns()), changed
+
+
+def test_deploy_changes_run_only_the_structure_workflow() -> None:
+    # `_triggered` covers the member and contracts pipelines; structure.yml is checked apart.
+    assert _triggered("deploy/x.yml") == set()
+    assert any(_matches(p, "deploy/x.yml") for p in _structure_patterns())
 
 
 @pytest.mark.parametrize("file_name", sorted(_workflow_texts()))
@@ -286,3 +297,18 @@ def test_member_job_builds_an_isolated_environment_and_checks_only_the_member() 
     commands = [line for line in script.splitlines() if not line.lstrip().startswith("#")]
     assert 'uv sync --locked --package "$package"' in commands
     assert not any(re.search(r"--all-packages|--group dev\b", line) for line in commands)
+
+
+def test_sync_script_refuses_the_shared_venv_outside_ci() -> None:
+    script = (SCRIPTS_DIR / "sync-member.sh").read_text(encoding="utf-8")
+    guard = 'if [ "${CI:-}" != "true" ] && [ -z "${UV_PROJECT_ENVIRONMENT:-}" ]; then'
+    assert guard in script
+    assert script.index(guard) < script.index("uv sync --locked"), "guard must precede the sync"
+
+
+def test_lint_and_tests_still_run_after_a_format_failure() -> None:
+    text = _workflow_texts()["_member-ci.yml"]
+    condition = "if: ${{ !cancelled() && steps.sync.outcome == 'success' }}"
+    assert "        id: sync\n        run: bash" in text
+    for step in ("Ruff lint", "Unit tests"):
+        assert f"      - name: {step}\n        {condition}\n" in text, step
