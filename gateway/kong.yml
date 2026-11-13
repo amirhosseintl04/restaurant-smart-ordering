@@ -1,0 +1,3 @@
+# Placeholder declarative configuration for Kong Gateway in DB-less mode (SAD 12.1, ADR-06).
+# Task I1-13 replaces this file with the routes and plugins of SAD 11.2 and 6.2.
+_format_version: "3.0"
