@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RestaurantRegistered",
+  "description": "A restaurant (tenant) was registered. Catalog and Order prepare the tenant's space (SAD 7.2). The envelope tenant_id equals data.restaurant_id. Routing key: restaurant.registered.",
+  "allOf": [
+    {
+      "$ref": "envelope.schema.json"
+    }
+  ],
+  "properties": {
+    "event_type": {
+      "const": "RestaurantRegistered"
+    },
+    "event_version": {
+      "const": 1
+    },
+    "producer": {
+      "const": "restaurant-service"
+    },
+    "data": {
+      "type": "object",
+      "required": [
+        "restaurant_id",
+        "name",
+        "plan"
+      ],
+      "properties": {
+        "restaurant_id": {
+          "$ref": "common.schema.json#/$defs/id"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "plan": {
+          "description": "Code of the subscription plan, e.g. basic.",
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_-]{0,31}$"
+        }
+      }
+    }
+  }
+}

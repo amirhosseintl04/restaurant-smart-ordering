@@ -1,0 +1,23 @@
+{
+  "event_id": "2a4e8c1b-6f3d-4a7e-9c5b-1d0f8e6a3b72",
+  "event_type": "OrderUpdated",
+  "event_version": 1,
+  "occurred_at": "2026-11-13T10:01:20Z",
+  "producer": "order-service",
+  "tenant_id": "rest_42",
+  "correlation_id": "c-91b2f4c7",
+  "data": {
+    "order_id": "ord_501",
+    "customer_ref": "bale:98123456",
+    "added_items": [
+      {
+        "product_id": "p_44",
+        "qty": 1,
+        "unit_price": 48000,
+        "name": "سیب‌زمینی سرخ‌کرده"
+      }
+    ],
+    "removed_items": [],
+    "total": 458000
+  }
+}

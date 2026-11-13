@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "OrderCancelled",
+  "description": "An order was cancelled: by the customer in CREATED, or by staff in CREATED or ACCEPTED with a reason (SAD 10.5). Routing key: order.cancelled.",
+  "allOf": [
+    {
+      "$ref": "envelope.schema.json"
+    }
+  ],
+  "properties": {
+    "event_type": {
+      "const": "OrderCancelled"
+    },
+    "event_version": {
+      "const": 1
+    },
+    "producer": {
+      "const": "order-service"
+    },
+    "data": {
+      "type": "object",
+      "required": [
+        "order_id",
+        "customer_ref",
+        "reason",
+        "cancelled_by"
+      ],
+      "properties": {
+        "order_id": {
+          "$ref": "common.schema.json#/$defs/id"
+        },
+        "customer_ref": {
+          "$ref": "common.schema.json#/$defs/customer_ref"
+        },
+        "reason": {
+          "description": "Reason given by staff; null when the customer cancels without one.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "cancelled_by": {
+          "type": "string",
+          "enum": [
+            "customer",
+            "staff"
+          ]
+        }
+      }
+    }
+  }
+}

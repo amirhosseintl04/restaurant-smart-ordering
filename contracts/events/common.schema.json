@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Common event definitions",
+  "description": "Definitions shared by the event schemas in this folder. Not an event itself.",
+  "$defs": {
+    "id": {
+      "description": "Opaque identifier (tenant, order, product, promotion, suggestion, customer). URL-safe; consumers never parse it. The SAD samples (rest_42, ord_501, p_12, sg_77) and UUIDs both fit.",
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{1,64}$"
+    },
+    "money": {
+      "description": "Integer amount in Toman, currency IRT (SAD 11.1).",
+      "type": "integer",
+      "minimum": 0
+    },
+    "channel": {
+      "description": "Channel name, e.g. bale. An open value, not an enum, so a new channel needs no contract change (QA-M1).",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,31}$"
+    },
+    "customer_ref": {
+      "description": "Channel identity of the customer as <channel>:<external_user_id>, e.g. bale:98123456.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,31}:.{1,128}$"
+    },
+    "order_status": {
+      "description": "Order lifecycle states (SAD 10.5).",
+      "type": "string",
+      "enum": ["CREATED", "ACCEPTED", "PREPARING", "READY", "DELIVERED", "CANCELLED"]
+    },
+    "order_line": {
+      "description": "One line of an order with the unit price snapshotted by Order at placement time (SAD 6.4, QA-SEC2).",
+      "type": "object",
+      "required": ["product_id", "qty", "unit_price"],
+      "properties": {
+        "product_id": { "$ref": "#/$defs/id" },
+        "qty": { "type": "integer", "minimum": 1 },
+        "unit_price": { "$ref": "#/$defs/money" },
+        "name": {
+          "description": "Product name snapshotted from the Catalog price quote, so Notification can render a message without the menu. Optional in version 1 because the SAD 7.1 sample omits it; Order always sends it.",
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "OrderUpdated",
+  "description": "The items of an order in status CREATED changed, e.g. an accepted suggestion (SAD 7.2, 10.2). added_items and removed_items are deltas: a quantity increase appears in added_items with the added quantity, a decrease or removal in removed_items with the removed quantity. Routing key: order.updated.",
+  "allOf": [
+    {
+      "$ref": "envelope.schema.json"
+    }
+  ],
+  "properties": {
+    "event_type": {
+      "const": "OrderUpdated"
+    },
+    "event_version": {
+      "const": 1
+    },
+    "producer": {
+      "const": "order-service"
+    },
+    "data": {
+      "type": "object",
+      "required": [
+        "order_id",
+        "customer_ref",
+        "added_items",
+        "removed_items",
+        "total"
+      ],
+      "properties": {
+        "order_id": {
+          "$ref": "common.schema.json#/$defs/id"
+        },
+        "customer_ref": {
+          "$ref": "common.schema.json#/$defs/customer_ref"
+        },
+        "added_items": {
+          "type": "array",
+          "items": {
+            "$ref": "common.schema.json#/$defs/order_line"
+          }
+        },
+        "removed_items": {
+          "type": "array",
+          "items": {
+            "$ref": "common.schema.json#/$defs/order_line"
+          }
+        },
+        "total": {
+          "description": "Order total after the change.",
+          "$ref": "common.schema.json#/$defs/money"
+        }
+      }
+    }
+  }
+}

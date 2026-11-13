@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CustomerRegistered",
+  "description": "A customer became a member of a restaurant. Analytics counts member customers (SAD 7.2). Carries no personal data. Routing key: customer.registered.",
+  "allOf": [
+    {
+      "$ref": "envelope.schema.json"
+    }
+  ],
+  "properties": {
+    "event_type": {
+      "const": "CustomerRegistered"
+    },
+    "event_version": {
+      "const": 1
+    },
+    "producer": {
+      "const": "identity-service"
+    },
+    "data": {
+      "type": "object",
+      "required": [
+        "customer_id",
+        "channel"
+      ],
+      "properties": {
+        "customer_id": {
+          "$ref": "common.schema.json#/$defs/id"
+        },
+        "channel": {
+          "$ref": "common.schema.json#/$defs/channel"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "event_id": "f2d6a0b4-9c3e-4a1f-b7d5-8e4c6a2f0b58",
+  "event_type": "SuggestionAccepted",
+  "event_version": 1,
+  "occurred_at": "2026-11-13T10:01:21Z",
+  "producer": "conversation-service",
+  "tenant_id": "rest_42",
+  "correlation_id": "c-91b2f4c7",
+  "data": {
+    "suggestion_id": "sg_77",
+    "order_id": "ord_501",
+    "added_amount": 48000
+  }
+}

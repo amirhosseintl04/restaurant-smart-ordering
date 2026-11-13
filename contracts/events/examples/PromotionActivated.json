@@ -1,0 +1,15 @@
+{
+  "event_id": "0e2f6a37-5d0c-4f43-8a5e-7c3b0d9f1a22",
+  "event_type": "PromotionActivated",
+  "event_version": 1,
+  "occurred_at": "2026-11-13T08:00:00Z",
+  "producer": "catalog-service",
+  "tenant_id": "rest_42",
+  "correlation_id": "c-b2740c95",
+  "data": {
+    "promotion_id": "promo_7",
+    "product_id": "p_44",
+    "discount": 20,
+    "valid_until": "2026-11-13T20:30:00Z"
+  }
+}

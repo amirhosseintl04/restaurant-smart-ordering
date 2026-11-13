@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RestaurantSuspended",
+  "description": "A restaurant was suspended. Order stops accepting new orders for the tenant (SAD 6.2, 7.2). The envelope tenant_id equals data.restaurant_id. Routing key: restaurant.suspended.",
+  "allOf": [
+    {
+      "$ref": "envelope.schema.json"
+    }
+  ],
+  "properties": {
+    "event_type": {
+      "const": "RestaurantSuspended"
+    },
+    "event_version": {
+      "const": 1
+    },
+    "producer": {
+      "const": "restaurant-service"
+    },
+    "data": {
+      "type": "object",
+      "required": [
+        "restaurant_id",
+        "reason"
+      ],
+      "properties": {
+        "restaurant_id": {
+          "$ref": "common.schema.json#/$defs/id"
+        },
+        "reason": {
+          "description": "Free-text reason entered by the platform admin.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        }
+      }
+    }
+  }
+}

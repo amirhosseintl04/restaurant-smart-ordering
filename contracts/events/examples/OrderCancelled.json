@@ -1,0 +1,15 @@
+{
+  "event_id": "e8b3d6f1-4a2c-4e9b-8d7a-6c1f0b5e9d34",
+  "event_type": "OrderCancelled",
+  "event_version": 1,
+  "occurred_at": "2026-11-13T10:06:45Z",
+  "producer": "order-service",
+  "tenant_id": "rest_42",
+  "correlation_id": "c-c40d9a16",
+  "data": {
+    "order_id": "ord_502",
+    "customer_ref": "bale:98765432",
+    "reason": "Out of chicken for today",
+    "cancelled_by": "staff"
+  }
+}

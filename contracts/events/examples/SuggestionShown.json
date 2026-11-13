@@ -1,0 +1,15 @@
+{
+  "event_id": "a1c5e9f3-7b2d-4f6a-8e0c-9d3b5a7f1e46",
+  "event_type": "SuggestionShown",
+  "event_version": 1,
+  "occurred_at": "2026-11-13T10:00:02Z",
+  "producer": "conversation-service",
+  "tenant_id": "rest_42",
+  "correlation_id": "c-7d1e3a90",
+  "data": {
+    "suggestion_id": "sg_77",
+    "order_id": "ord_501",
+    "type": "promotion",
+    "product_id": "p_44"
+  }
+}

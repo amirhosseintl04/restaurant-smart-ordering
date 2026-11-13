@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PromotionExpired",
+  "description": "A promotion stopped being active, because its window ended or the manager ended it early. Conversation removes it from suggestions (SAD 7.2). Routing key: catalog.promotion_expired.",
+  "allOf": [
+    {
+      "$ref": "envelope.schema.json"
+    }
+  ],
+  "properties": {
+    "event_type": {
+      "const": "PromotionExpired"
+    },
+    "event_version": {
+      "const": 1
+    },
+    "producer": {
+      "const": "catalog-service"
+    },
+    "data": {
+      "type": "object",
+      "required": [
+        "promotion_id",
+        "product_id"
+      ],
+      "properties": {
+        "promotion_id": {
+          "$ref": "common.schema.json#/$defs/id"
+        },
+        "product_id": {
+          "description": "Product the promotion applied to.",
+          "$ref": "common.schema.json#/$defs/id"
+        }
+      }
+    }
+  }
+}

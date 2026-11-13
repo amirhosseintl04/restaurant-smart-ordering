@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SuggestionShown",
+  "description": "A suggestion was shown to the customer after an order was placed. Denominator of the acceptance rate (SAD 7.2, 9.4). Routing key: suggestion.shown.",
+  "allOf": [
+    {
+      "$ref": "envelope.schema.json"
+    }
+  ],
+  "properties": {
+    "event_type": {
+      "const": "SuggestionShown"
+    },
+    "event_version": {
+      "const": 1
+    },
+    "producer": {
+      "const": "conversation-service"
+    },
+    "data": {
+      "type": "object",
+      "required": [
+        "suggestion_id",
+        "order_id",
+        "type",
+        "product_id"
+      ],
+      "properties": {
+        "suggestion_id": {
+          "$ref": "common.schema.json#/$defs/id"
+        },
+        "order_id": {
+          "$ref": "common.schema.json#/$defs/id"
+        },
+        "type": {
+          "description": "Why the product was suggested. A complement that also has an active promotion is reported as promotion (SAD 9.6, 10.1).",
+          "type": "string",
+          "enum": [
+            "complement",
+            "promotion"
+          ]
+        },
+        "product_id": {
+          "$ref": "common.schema.json#/$defs/id"
+        }
+      }
+    }
+  }
+}

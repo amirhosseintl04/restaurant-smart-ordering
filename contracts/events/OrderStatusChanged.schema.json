@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "OrderStatusChanged",
+  "description": "Staff moved an order forward in its lifecycle (SAD 10.5). Notification informs the customer. Cancellation is not reported here: it publishes OrderCancelled only. Routing key: order.status_changed.",
+  "allOf": [
+    {
+      "$ref": "envelope.schema.json"
+    }
+  ],
+  "properties": {
+    "event_type": {
+      "const": "OrderStatusChanged"
+    },
+    "event_version": {
+      "const": 1
+    },
+    "producer": {
+      "const": "order-service"
+    },
+    "data": {
+      "type": "object",
+      "required": [
+        "order_id",
+        "customer_ref",
+        "from",
+        "to"
+      ],
+      "properties": {
+        "order_id": {
+          "$ref": "common.schema.json#/$defs/id"
+        },
+        "customer_ref": {
+          "$ref": "common.schema.json#/$defs/customer_ref"
+        },
+        "from": {
+          "type": "string",
+          "enum": [
+            "CREATED",
+            "ACCEPTED",
+            "PREPARING",
+            "READY"
+          ]
+        },
+        "to": {
+          "type": "string",
+          "enum": [
+            "ACCEPTED",
+            "PREPARING",
+            "READY",
+            "DELIVERED"
+          ]
+        }
+      }
+    }
+  }
+}

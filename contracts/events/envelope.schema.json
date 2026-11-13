@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "EventEnvelope",
+  "description": "Shared envelope of every domain event (SAD 7.1). Each event schema in this folder composes it with allOf and narrows event_type, event_version, producer and data. The envelope is closed: adding or removing an envelope field is a breaking change for every consumer.",
+  "type": "object",
+  "required": [
+    "event_id",
+    "event_type",
+    "event_version",
+    "occurred_at",
+    "producer",
+    "tenant_id",
+    "correlation_id",
+    "data"
+  ],
+  "properties": {
+    "event_id": {
+      "description": "Unique per event. Consumers record it in processed_events to stay idempotent (SAD 6.3).",
+      "type": "string",
+      "format": "uuid"
+    },
+    "event_type": {
+      "description": "Past-tense event name, e.g. OrderCreated (SAD 7).",
+      "type": "string",
+      "pattern": "^[A-Z][A-Za-z0-9]*$"
+    },
+    "event_version": {
+      "description": "Schema version of data. Changes only on a breaking change (SAD 7.4).",
+      "type": "integer",
+      "minimum": 1
+    },
+    "occurred_at": {
+      "description": "When the fact happened in the publishing service, ISO-8601 in UTC (SAD 11.1).",
+      "type": "string",
+      "format": "date-time",
+      "pattern": "Z$"
+    },
+    "producer": {
+      "description": "Publishing service. Only the five services with an outbox publish events (SAD 6.3).",
+      "type": "string",
+      "enum": [
+        "identity-service",
+        "restaurant-service",
+        "catalog-service",
+        "conversation-service",
+        "order-service"
+      ]
+    },
+    "tenant_id": {
+      "description": "Restaurant the event belongs to (SAD 8.2). Present on every event; for restaurant.* events it equals data.restaurant_id.",
+      "$ref": "common.schema.json#/$defs/id"
+    },
+    "correlation_id": {
+      "description": "Correlation ID of the request that caused the event (SAD 13.2).",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "data": {
+      "description": "Event payload, defined per event type. Open to additional properties: consumers ignore fields they do not know (SAD 7.4 rule 1).",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false
+}

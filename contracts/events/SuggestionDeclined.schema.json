@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SuggestionDeclined",
+  "description": "The customer declined a suggestion. Used to analyse unsuccessful suggestions (SAD 7.2). Routing key: suggestion.declined.",
+  "allOf": [
+    {
+      "$ref": "envelope.schema.json"
+    }
+  ],
+  "properties": {
+    "event_type": {
+      "const": "SuggestionDeclined"
+    },
+    "event_version": {
+      "const": 1
+    },
+    "producer": {
+      "const": "conversation-service"
+    },
+    "data": {
+      "type": "object",
+      "required": [
+        "suggestion_id",
+        "order_id"
+      ],
+      "properties": {
+        "suggestion_id": {
+          "$ref": "common.schema.json#/$defs/id"
+        },
+        "order_id": {
+          "$ref": "common.schema.json#/$defs/id"
+        }
+      }
+    }
+  }
+}

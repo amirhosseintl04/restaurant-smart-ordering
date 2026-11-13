@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "MenuItemAvailabilityChanged",
+  "description": "The availability of a menu item was set. Published on every availability change and when an item is created, so the projection never has to guess (SAD 8.3, 10.3). Routing key: catalog.menu_item_availability_changed.",
+  "allOf": [
+    {
+      "$ref": "envelope.schema.json"
+    }
+  ],
+  "properties": {
+    "event_type": {
+      "const": "MenuItemAvailabilityChanged"
+    },
+    "event_version": {
+      "const": 1
+    },
+    "producer": {
+      "const": "catalog-service"
+    },
+    "data": {
+      "type": "object",
+      "required": [
+        "product_id",
+        "is_available"
+      ],
+      "properties": {
+        "product_id": {
+          "$ref": "common.schema.json#/$defs/id"
+        },
+        "is_available": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

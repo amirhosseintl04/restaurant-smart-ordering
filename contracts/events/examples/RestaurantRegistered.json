@@ -1,0 +1,14 @@
+{
+  "event_id": "1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed",
+  "event_type": "RestaurantRegistered",
+  "event_version": 1,
+  "occurred_at": "2026-11-10T08:15:00Z",
+  "producer": "restaurant-service",
+  "tenant_id": "rest_42",
+  "correlation_id": "c-0a51c3e2",
+  "data": {
+    "restaurant_id": "rest_42",
+    "name": "برگرلند",
+    "plan": "basic"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "event_id": "5c7a9e3d-8b1f-4d2c-a6e4-0f9b7d5c3a18",
+  "event_type": "OrderStatusChanged",
+  "event_version": 1,
+  "occurred_at": "2026-11-13T10:03:00Z",
+  "producer": "order-service",
+  "tenant_id": "rest_42",
+  "correlation_id": "c-3e6f0b82",
+  "data": {
+    "order_id": "ord_501",
+    "customer_ref": "bale:98123456",
+    "from": "CREATED",
+    "to": "ACCEPTED"
+  }
+}

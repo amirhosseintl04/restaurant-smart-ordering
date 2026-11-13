@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "MenuItemUpdated",
+  "description": "A menu item was created or changed. Carries the full descriptive state of the item (event-carried state transfer), so Conversation upserts its menu_projection row and recomputes the embedding (SAD 8.3). Availability is not part of this event; it travels in MenuItemAvailabilityChanged. Routing key: catalog.menu_item_updated.",
+  "allOf": [
+    {
+      "$ref": "envelope.schema.json"
+    }
+  ],
+  "properties": {
+    "event_type": {
+      "const": "MenuItemUpdated"
+    },
+    "event_version": {
+      "const": 1
+    },
+    "producer": {
+      "const": "catalog-service"
+    },
+    "data": {
+      "type": "object",
+      "required": [
+        "product_id",
+        "name",
+        "aliases",
+        "description",
+        "price",
+        "category",
+        "complements"
+      ],
+      "properties": {
+        "product_id": {
+          "$ref": "common.schema.json#/$defs/id"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "aliases": {
+          "description": "Alternative and colloquial names. Empty array when there are none.",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "description": {
+          "description": "Ingredients and notes. Empty string when there is none.",
+          "type": "string",
+          "maxLength": 2000
+        },
+        "price": {
+          "description": "List price in Toman. Display only (menu_projection.display_price); the amount of an order always comes from Order (SAD 8.3).",
+          "$ref": "common.schema.json#/$defs/money"
+        },
+        "category": {
+          "description": "Category name as shown to customers.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "complements": {
+          "description": "Complement rules of this item (SAD 8.3: published with the item). Empty array when there are none.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "product_id",
+              "priority"
+            ],
+            "properties": {
+              "product_id": {
+                "$ref": "common.schema.json#/$defs/id"
+              },
+              "priority": {
+                "description": "Manager-set rank; 1 is suggested first (SAD 9.4).",
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

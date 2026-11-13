@@ -1,0 +1,13 @@
+{
+  "event_id": "c4a760a8-dbcf-4e14-9a05-5a2f4b1f6c11",
+  "event_type": "MenuItemAvailabilityChanged",
+  "event_version": 1,
+  "occurred_at": "2026-11-13T11:05:30Z",
+  "producer": "catalog-service",
+  "tenant_id": "rest_42",
+  "correlation_id": "c-88d3e0f1",
+  "data": {
+    "product_id": "p_12",
+    "is_available": false
+  }
+}

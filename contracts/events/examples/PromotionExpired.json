@@ -1,0 +1,13 @@
+{
+  "event_id": "7d9c1f52-2f6e-4c0a-b1d8-3e5a9c7b4f10",
+  "event_type": "PromotionExpired",
+  "event_version": 1,
+  "occurred_at": "2026-11-13T20:30:00Z",
+  "producer": "catalog-service",
+  "tenant_id": "rest_42",
+  "correlation_id": "c-e19a3d57",
+  "data": {
+    "promotion_id": "promo_7",
+    "product_id": "p_44"
+  }
+}

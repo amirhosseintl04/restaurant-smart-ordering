@@ -1,0 +1,31 @@
+{
+  "event_id": "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",
+  "event_type": "MenuItemUpdated",
+  "event_version": 1,
+  "occurred_at": "2026-11-13T07:30:00Z",
+  "producer": "catalog-service",
+  "tenant_id": "rest_42",
+  "correlation_id": "c-41f7a6b0",
+  "data": {
+    "product_id": "p_12",
+    "name": "همبرگر مرغ",
+    "aliases": [
+      "همبر مرغ",
+      "برگر مرغ",
+      "چیکن برگر"
+    ],
+    "description": "فیله مرغ گریل‌شده، کاهو، گوجه و سس مخصوص",
+    "price": 185000,
+    "category": "برگر",
+    "complements": [
+      {
+        "product_id": "p_44",
+        "priority": 1
+      },
+      {
+        "product_id": "p_31",
+        "priority": 2
+      }
+    ]
+  }
+}

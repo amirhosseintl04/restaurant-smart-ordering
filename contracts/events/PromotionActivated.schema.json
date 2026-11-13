@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PromotionActivated",
+  "description": "A time-bound promotion on one product became active. Conversation includes it in suggestions (SAD 7.2, 9.4). Routing key: catalog.promotion_activated.",
+  "allOf": [
+    {
+      "$ref": "envelope.schema.json"
+    }
+  ],
+  "properties": {
+    "event_type": {
+      "const": "PromotionActivated"
+    },
+    "event_version": {
+      "const": 1
+    },
+    "producer": {
+      "const": "catalog-service"
+    },
+    "data": {
+      "type": "object",
+      "required": [
+        "promotion_id",
+        "product_id",
+        "discount",
+        "valid_until"
+      ],
+      "properties": {
+        "promotion_id": {
+          "$ref": "common.schema.json#/$defs/id"
+        },
+        "product_id": {
+          "$ref": "common.schema.json#/$defs/id"
+        },
+        "discount": {
+          "description": "Discount as a percentage of the list price (SAD 9.4).",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "valid_until": {
+          "description": "End of the promotion window, ISO-8601 in UTC.",
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        }
+      }
+    }
+  }
+}

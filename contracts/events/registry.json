@@ -1,0 +1,138 @@
+{
+  "description": "Machine-readable form of SAD 7.2 (event list) and SAD 7.3 (RabbitMQ topology). Schema files are relative to this folder.",
+  "exchange": { "name": "domain.events", "type": "topic", "durable": true },
+  "events": [
+    {
+      "event_type": "RestaurantRegistered",
+      "event_version": 1,
+      "routing_key": "restaurant.registered",
+      "producer": "restaurant-service",
+      "consumers": ["catalog-service", "order-service"],
+      "schema": "RestaurantRegistered.schema.json"
+    },
+    {
+      "event_type": "RestaurantSuspended",
+      "event_version": 1,
+      "routing_key": "restaurant.suspended",
+      "producer": "restaurant-service",
+      "consumers": ["catalog-service", "order-service"],
+      "schema": "RestaurantSuspended.schema.json"
+    },
+    {
+      "event_type": "CustomerRegistered",
+      "event_version": 1,
+      "routing_key": "customer.registered",
+      "producer": "identity-service",
+      "consumers": ["analytics-service"],
+      "schema": "CustomerRegistered.schema.json"
+    },
+    {
+      "event_type": "MenuItemUpdated",
+      "event_version": 1,
+      "routing_key": "catalog.menu_item_updated",
+      "producer": "catalog-service",
+      "consumers": ["conversation-service"],
+      "schema": "MenuItemUpdated.schema.json"
+    },
+    {
+      "event_type": "MenuItemAvailabilityChanged",
+      "event_version": 1,
+      "routing_key": "catalog.menu_item_availability_changed",
+      "producer": "catalog-service",
+      "consumers": ["conversation-service"],
+      "schema": "MenuItemAvailabilityChanged.schema.json"
+    },
+    {
+      "event_type": "PromotionActivated",
+      "event_version": 1,
+      "routing_key": "catalog.promotion_activated",
+      "producer": "catalog-service",
+      "consumers": ["conversation-service"],
+      "schema": "PromotionActivated.schema.json"
+    },
+    {
+      "event_type": "PromotionExpired",
+      "event_version": 1,
+      "routing_key": "catalog.promotion_expired",
+      "producer": "catalog-service",
+      "consumers": ["conversation-service"],
+      "schema": "PromotionExpired.schema.json"
+    },
+    {
+      "event_type": "OrderCreated",
+      "event_version": 1,
+      "routing_key": "order.created",
+      "producer": "order-service",
+      "consumers": ["notification-service", "analytics-service"],
+      "schema": "OrderCreated.schema.json"
+    },
+    {
+      "event_type": "OrderUpdated",
+      "event_version": 1,
+      "routing_key": "order.updated",
+      "producer": "order-service",
+      "consumers": ["notification-service", "analytics-service"],
+      "schema": "OrderUpdated.schema.json"
+    },
+    {
+      "event_type": "OrderStatusChanged",
+      "event_version": 1,
+      "routing_key": "order.status_changed",
+      "producer": "order-service",
+      "consumers": ["notification-service", "analytics-service"],
+      "schema": "OrderStatusChanged.schema.json"
+    },
+    {
+      "event_type": "OrderCancelled",
+      "event_version": 1,
+      "routing_key": "order.cancelled",
+      "producer": "order-service",
+      "consumers": ["notification-service", "analytics-service"],
+      "schema": "OrderCancelled.schema.json"
+    },
+    {
+      "event_type": "SuggestionShown",
+      "event_version": 1,
+      "routing_key": "suggestion.shown",
+      "producer": "conversation-service",
+      "consumers": ["analytics-service"],
+      "schema": "SuggestionShown.schema.json"
+    },
+    {
+      "event_type": "SuggestionAccepted",
+      "event_version": 1,
+      "routing_key": "suggestion.accepted",
+      "producer": "conversation-service",
+      "consumers": ["analytics-service"],
+      "schema": "SuggestionAccepted.schema.json"
+    },
+    {
+      "event_type": "SuggestionDeclined",
+      "event_version": 1,
+      "routing_key": "suggestion.declined",
+      "producer": "conversation-service",
+      "consumers": ["analytics-service"],
+      "schema": "SuggestionDeclined.schema.json"
+    }
+  ],
+  "queues": [
+    { "name": "notification.q", "consumer": "notification-service", "bindings": ["order.*"] },
+    {
+      "name": "analytics.q",
+      "consumer": "analytics-service",
+      "bindings": ["order.*", "suggestion.*", "customer.*"]
+    },
+    { "name": "conversation.q", "consumer": "conversation-service", "bindings": ["catalog.*"] },
+    { "name": "catalog.q", "consumer": "catalog-service", "bindings": ["restaurant.*"] },
+    { "name": "order.q", "consumer": "order-service", "bindings": ["restaurant.*"] }
+  ],
+  "retry": {
+    "queues": [
+      { "suffix": ".retry.10s", "ttl_ms": 10000 },
+      { "suffix": ".retry.1m", "ttl_ms": 60000 },
+      { "suffix": ".retry.5m", "ttl_ms": 300000 }
+    ],
+    "max_attempts": 3,
+    "dlq_suffix": ".dlq"
+  }
+}

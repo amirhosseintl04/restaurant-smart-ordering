@@ -1,0 +1,27 @@
+{
+  "event_id": "8f14e45f-ceea-467a-9a4b-2c1d8e0b7a21",
+  "event_type": "OrderCreated",
+  "event_version": 1,
+  "occurred_at": "2026-11-13T10:00:00Z",
+  "producer": "order-service",
+  "tenant_id": "rest_42",
+  "correlation_id": "c-7d1e3a90",
+  "data": {
+    "order_id": "ord_501",
+    "customer_ref": "bale:98123456",
+    "items": [
+      {
+        "product_id": "p_12",
+        "qty": 2,
+        "unit_price": 185000
+      },
+      {
+        "product_id": "p_31",
+        "qty": 1,
+        "unit_price": 40000
+      }
+    ],
+    "total": 410000,
+    "source": "conversation"
+  }
+}

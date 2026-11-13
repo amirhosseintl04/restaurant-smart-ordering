@@ -1,0 +1,13 @@
+{
+  "event_id": "6ec0bd7f-11c0-43da-975e-2a8ad9ebae0b",
+  "event_type": "RestaurantSuspended",
+  "event_version": 1,
+  "occurred_at": "2026-12-01T06:00:00Z",
+  "producer": "restaurant-service",
+  "tenant_id": "rest_42",
+  "correlation_id": "c-5f0d27aa",
+  "data": {
+    "restaurant_id": "rest_42",
+    "reason": "Subscription invoice overdue"
+  }
+}

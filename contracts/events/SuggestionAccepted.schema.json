@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SuggestionAccepted",
+  "description": "The customer accepted a suggestion and Order added the item. Numerator of the acceptance rate and added revenue (SAD 7.2, 10.2). Routing key: suggestion.accepted.",
+  "allOf": [
+    {
+      "$ref": "envelope.schema.json"
+    }
+  ],
+  "properties": {
+    "event_type": {
+      "const": "SuggestionAccepted"
+    },
+    "event_version": {
+      "const": 1
+    },
+    "producer": {
+      "const": "conversation-service"
+    },
+    "data": {
+      "type": "object",
+      "required": [
+        "suggestion_id",
+        "order_id",
+        "added_amount"
+      ],
+      "properties": {
+        "suggestion_id": {
+          "$ref": "common.schema.json#/$defs/id"
+        },
+        "order_id": {
+          "$ref": "common.schema.json#/$defs/id"
+        },
+        "added_amount": {
+          "description": "Increase of the order total in Toman, computed from Order's responses, never by the LLM (SAD 9.5).",
+          "$ref": "common.schema.json#/$defs/money"
+        }
+      }
+    }
+  }
+}
