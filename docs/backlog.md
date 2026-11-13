@@ -40,7 +40,7 @@ implementer worktrees; the seven service skeletons are independent of each other
 
 | ID | Task | Owner | Depends on | Acceptance criteria | P | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| I1-01 | Repo skeleton: uv workspace honoring `.python-version` 3.12 (ADR-12), root `pyproject.toml` with ruff and pytest config, folders from SAD 12.4, service template README | implementer | — | `uv sync` succeeds, `uv run ruff check .` and `uv run pytest` run (zero tests allowed), layout matches SAD 12.4 | — | [ ] |
+| I1-01 | Repo skeleton: uv workspace honoring `.python-version` 3.12 (ADR-12), root `pyproject.toml` with ruff and pytest config, folders from SAD 12.4, service template README | implementer | — | `uv sync` succeeds; `uv run ruff check` on the member folders (`libs services adapters`) is clean; `uv run pytest` passes; layout matches SAD 12.4 (src layout, ADR-14). Done: merged `bb36b00`, 16 tests | — | [x] |
 | I1-02 | Contracts: event envelope JSON Schema and one schema per event of SAD 7.2 (14 events) in `contracts/events/`; OpenAPI 3.1 per service in `contracts/openapi/` covering `/health/*`, the internal endpoints of SAD 11.3 and the public endpoints needed for the fake order (`POST /v1/chat/messages`, `GET /v1/orders`) | Lead writes, reviewer validates | I1-01 | Schemas validate against the SAD 7.1 example; `event_version` present; OpenAPI files lint clean; human approves | gate | [ ] |
 | I1-03 | `libs/platform`: settings loader, structlog JSON logging with `correlation_id`, `tenant_id`, `event_id`; FastAPI app factory with `/health/live` and `/health/ready`; correlation and tenant middleware (accept `X-Tenant-Id` only from gateway); RFC 9457 error handler; event envelope model; `outbox` and `processed_events` SQLAlchemy mixins; idempotent consumer helper; RabbitMQ topology declaration (exchange, per-consumer queues, retry queues, DLQ per SAD 7.3) | implementer | I1-02 | Unit tests for envelope validation, middleware, idempotency helper and topology names; no domain model inside | P | [ ] |
 | I1-04 | `deploy/docker-compose.yml`: PostgreSQL 16 with pgvector image and init script creating seven databases and users (SAD 8.1), RabbitMQ 3.13 with management plugin, Kong DB-less mounted from `gateway/kong.yml`, volumes `pg-data`, `mq-data`; `.env.example` kept in sync | implementer | I1-01, Docker Desktop confirmed by the human | `docker compose config` validates; init script is idempotent; no secrets in the file | P | [ ] |
@@ -64,6 +64,17 @@ FastAPI app built with the platform factory, Alembic baseline
 migration, Dockerfile based on Python 3.12, `/health/live` and `/health/ready` implemented
 (ready checks database and broker), unit tests passing, OpenAPI exported and identical to
 `contracts/openapi/<service>.yaml`, logs carry `correlation_id`.
+
+### Follow-ups from the I1-01 review
+
+| ID | Follow-up | Where it lands | Status |
+| --- | --- | --- | --- |
+| F1-01 | `contracts/events/README.md` cites SAD 7.1 (envelope) and 7.3 (routing keys) | Folded into the I1-01 branch | [x] |
+| F1-02 | `deploy/README.md` cites SAD 8.1 and ADR-03 | Folded into the I1-01 branch | [x] |
+| F1-03 | Import-boundary lint: every member is installed in one `.venv`, so a stray `import catalog_service` inside Order would pass locally. Add ruff `TID251` banned modules per service or import-linter contracts once real code exists | I1-03 (platform) or I1-14 (CI) | [ ] |
+| F1-04 | Service template explains the importlib consequence (no bare-name imports between test modules; fixtures in `conftest.py`) | Folded into the I1-01 branch | [x] |
+| F1-05 | `CHANGELOG.md` entry for I1-01 and ADR-14 (the ADR checklist asks for it) | I1-17 (docs-writer) | [ ] |
+| F1-06 | CI decision: per-service jobs run root `uv sync` or `uv sync --package <svc>-service` plus the dev group | I1-14 | [ ] |
 
 ## Iteration 2 — Ordering core (high level)
 
