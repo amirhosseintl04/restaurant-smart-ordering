@@ -157,7 +157,8 @@ def test_push_and_pull_request_filters_are_identical_native_path_filters(file_na
     assert paths["push"] == paths.get("pull_request"), f"{file_name}: push and PR filters differ"
     assert "paths-ignore" not in text, file_name
     assert re.search(r"^  push:\n    branches: \[main\]$", text, flags=re.MULTILINE), file_name
-    assert f".github/workflows/{file_name}" in paths["push"], f"{file_name}: not in its own filter"
+    own = f".github/workflows/{file_name}"
+    assert any(_matches(p, own) for p in paths["push"]), f"{file_name}: not in its own filter"
 
 
 def test_every_member_filter_covers_the_inputs_of_its_job() -> None:
@@ -232,6 +233,43 @@ def test_workflow_is_least_privilege_pinned_and_injection_free(file_name: str) -
         ), f"{file_name}: {action} is not pinned to a full commit SHA"
     injected = [line for line in _run_lines(text) if "${{" in line]
     assert not injected, f"{file_name}: expression interpolated into a shell script: {injected}"
+
+
+STRUCTURE_TESTS = (
+    "libs/platform/tests/test_workspace_layout.py",
+    "libs/platform/tests/test_ci_workflows.py",
+    "libs/platform/tests/test_deploy_compose.py",
+)
+
+
+def test_structure_workflow_runs_the_structural_tests_on_structural_changes() -> None:
+    text = _workflow_texts()["structure.yml"]
+    patterns = _trigger_paths(text)["push"]
+    for changed in (
+        "services/order/pyproject.toml",
+        "adapters/bale/pyproject.toml",
+        "libs/platform/tests/test_workspace_layout.py",
+        ".github/workflows/order.yml",
+        "deploy/docker-compose.yml",
+        "gateway/kong.yml",
+        ".env.example",
+        *SHARED_INPUTS[:3],
+    ):
+        assert any(_matches(p, changed) for p in patterns), changed
+    for changed in ("contracts/openapi/order.yaml", "docs/backlog.md", "README.md"):
+        assert not any(_matches(p, changed) for p in patterns), changed
+    run_lines = _run_lines(text)
+    assert f"bash {SYNC_SCRIPT} platform-lib" in run_lines
+    assert all(f"{test} \\" in run_lines or f"{test}; do" in run_lines for test in STRUCTURE_TESTS)
+    assert 'uv run --no-sync pytest "${tests[@]}"' in run_lines
+
+
+def test_platform_filter_leaves_member_manifests_to_the_structure_workflow() -> None:
+    patterns = _filters()["libs/platform"]
+    assert "contracts/events/envelope.schema.json" in patterns
+    assert "contracts/events/common.schema.json" in patterns
+    assert not any(_matches(p, "services/order/pyproject.toml") for p in patterns)
+    assert not any(_matches(p, "adapters/bale/pyproject.toml") for p in patterns)
 
 
 def test_member_job_builds_an_isolated_environment_and_checks_only_the_member() -> None:

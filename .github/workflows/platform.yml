@@ -1,8 +1,7 @@
-# CI for libs/platform (platform-lib). Besides the library itself it runs the structural
-# workspace test (libs/platform/tests/test_workspace_layout.py), which reads every member's
-# pyproject.toml, so it also runs when any member manifest or the root manifest changes.
-# That test only reads files from the checkout and imports nothing but platform_lib, so the
-# isolated environment of the other members is enough here too.
+# CI for libs/platform (platform-lib): the library, its unit tests and every test under
+# libs/platform/tests. It also runs when the event envelope or the common schema changes,
+# because the library's envelope code follows them. Changes to other members' manifests are
+# covered by the structure workflow (structure.yml), not here.
 name: platform
 
 on:
@@ -10,9 +9,8 @@ on:
     branches: [main]
     paths:
       - "libs/platform/**"
-      - "services/*/pyproject.toml"
-      - "adapters/*/pyproject.toml"
       - "contracts/events/envelope.schema.json"
+      - "contracts/events/common.schema.json"
       - "pyproject.toml"
       - "uv.lock"
       - ".python-version"
@@ -22,9 +20,8 @@ on:
   pull_request:
     paths:
       - "libs/platform/**"
-      - "services/*/pyproject.toml"
-      - "adapters/*/pyproject.toml"
       - "contracts/events/envelope.schema.json"
+      - "contracts/events/common.schema.json"
       - "pyproject.toml"
       - "uv.lock"
       - ".python-version"
