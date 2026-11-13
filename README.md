@@ -55,8 +55,8 @@ Development is run by a Lead agent (Claude Code) with three specialised subagent
 1. **Lead** plans each iteration from the SAD, writes the contracts, and commits shared code
    to `main`. The human approves the iteration plan.
 2. **implementer** receives one task, works in its own git worktree on a `feat/<task-id>`
-   branch, writes unit tests, runs them and commits. The Conversation service is implemented
-   with the strongest model at high effort.
+   branch, writes unit tests, runs them and commits. AI-core tasks in the Conversation service
+   (retrieval, extraction, suggestions, prompts) use the strongest model at high effort.
 3. **reviewer** branches from the feature tip (`review/<task-id>`), checks the change against
    the SAD, the contracts and the architecture rules, adds acceptance and contract tests, runs
    the full suite and recommends merge or not.

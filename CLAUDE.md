@@ -108,8 +108,9 @@ not try). Only key hashes are stored; JWT keys are files outside the repo (SAD 1
 
 Delegation rules:
 - One task ID per invocation; the brief names the SAD sections, contracts and acceptance criteria.
-- **Conversation service (AI core) is delegated to `implementer` with `model: fable`,
-  `effort: high`** passed on the Agent call.
+- **AI-core tasks in Conversation (retrieval, extraction, suggestion engine, prompt work) are
+  delegated with `model: fable`, `effort: high`** passed on the Agent call, starting in
+  Iteration 2. Skeleton and plumbing work in Conversation uses the default implementer model.
 - Every agent ends with the report format: what changed, tests run and results, open issues.
 - Agents read `CLAUDE.md` and the SAD sections named in their brief before coding.
 

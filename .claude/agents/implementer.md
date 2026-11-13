@@ -1,6 +1,6 @@
 ---
 name: implementer
-description: Implements exactly one service or backlog task per invocation with unit tests, in its own git worktree on a feat/<task-id>-<slug> branch. Use for every coding task in services/, libs/platform, adapters/, gateway/, deploy/ or .github/. For the Conversation service (AI core) the Lead must pass model fable and effort high on the call.
+description: Implements exactly one service or backlog task per invocation with unit tests, in its own git worktree on a feat/<task-id>-<slug> branch. Use for every coding task in services/, libs/platform, adapters/, gateway/, deploy/ or .github/. For AI-core tasks in Conversation (retrieval, extraction, suggestion engine, prompt work) the Lead passes model fable and effort high on the call.
 model: opus
 effort: medium
 isolation: worktree
