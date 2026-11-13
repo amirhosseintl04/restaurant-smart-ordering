@@ -17,6 +17,7 @@
 | --- | --- | --- |
 | 1 | Initial architecture document | 2026-11-13 |
 | 2 | Moved to `docs/architecture/SAD.md`; repository root renamed to `restaurant-smart-ordering/` in section 12.4; ADR-12 (uv and Python 3.12 pin) added to section 14 | 2026-11-13 |
+| 3 | Section 12.4 updated to the src layout of the uv workspace members; ADR-13 (proposed) and ADR-14 (src layout) added to section 14 | 2026-11-13 |
 
 ### Table of Contents
 
@@ -992,30 +993,38 @@ flowchart TB
 
 ```text
 restaurant-smart-ordering/
+├── pyproject.toml            # uv workspace root (ADR-12); members: libs/*, services/*, adapters/*
 ├── services/
 │   ├── identity/
-│   ├── restaurant/
-│   ├── catalog/
-│   ├── conversation/
-│   ├── order/
-│   ├── notification/
-│   └── analytics/
+│   │   ├── pyproject.toml    # distribution identity-service
+│   │   ├── src/identity_service/
+│   │   │   ├── api/          # routes and schemas
+│   │   │   ├── application/  # use cases and ports
+│   │   │   ├── domain/       # entities and business rules
+│   │   │   └── infrastructure/   # database, broker, external clients
+│   │   └── tests/
+│   ├── restaurant/           # same layout: src/restaurant_service/
+│   ├── catalog/              # src/catalog_service/
+│   ├── conversation/         # src/conversation_service/
+│   ├── order/                # src/order_service/
+│   ├── notification/         # src/notification_service/
+│   └── analytics/            # src/analytics_service/
 ├── adapters/
-│   └── bale/
+│   └── bale/                 # src/bale_adapter/
 ├── gateway/
 │   └── kong.yml              # declarative routes and plugins
 ├── contracts/
 │   ├── openapi/              # one spec per service
 │   └── events/               # JSON Schema per event
 ├── libs/
-│   └── platform/             # logging, outbox relay, event envelope (technical only)
+│   └── platform/             # src/platform_lib/: logging, outbox relay, event envelope (technical only)
 ├── deploy/
 │   └── docker-compose.yml
 └── docs/
     └── architecture/
 ```
 
-Each service is internally layered: `api/` (routes and schemas), `application/` (use cases), `domain/` (entities and business rules), `infrastructure/` (database, broker, external clients) and `tests/`. The `libs/platform` library contains technical code only; no domain model is shared through it, so no hidden coupling forms between services.
+Every service, adapter and library is a uv workspace member with its own `pyproject.toml` and a package in **src layout** (`src/<name>_service/` for services, `src/bale_adapter/`, `src/platform_lib/`; ADR-14), so the package is importable only when installed in the workspace environment, never by accident from the working directory. Each service package is internally layered: `api/` (routes and schemas), `application/` (use cases and ports), `domain/` (entities and business rules) and `infrastructure/` (database, broker, external clients); `tests/` sits beside `src/`. The `libs/platform` library (package `platform_lib`, named to avoid shadowing the standard-library `platform` module) contains technical code only; no domain model is shared through it, so no hidden coupling forms between services.
 
 ### 12.5. CI/CD Pipeline per Service
 
@@ -1091,6 +1100,8 @@ In v1, metrics are derived from logs. Prometheus, Grafana and distributed tracin
 | ADR-10 | Transactional Outbox for event publishing | Publishing directly after commit | Guarantees no event is lost (QA-R1) | Outbox table and relay process in every publishing service |
 | ADR-11 | The order is placed immediately and the suggestion comes after placement | Draft order with final confirmation | Matches the business specification; faster experience and one fewer conversational turn | Accepting a suggestion edits a placed order (`OrderUpdated`) |
 | ADR-12 | uv as dependency and environment manager; Python pinned to 3.12 via `.python-version` | pip + venv with requirements files, Poetry, PDM | One lock file for the monorepo workspace, fast installs in CI, local interpreter matches the container image | One more tool to install on every developer machine and in CI |
+| ADR-13 | LLM provider for extraction and phrasing (Proposed; decided after the Iteration 0 prototype) | — | Pending measurement on the golden set (QA-AI1, QA-P1, R3) | Pending |
+| ADR-14 | src layout for every workspace member (`services/<name>/src/<name>_service/`, `libs/platform/src/platform_lib/`) | Flat layout as drawn in SAD 12.4 v1.0 | A package is importable only when installed in the workspace environment, so no accidental imports from the working directory; uv's default layout | Deeper paths; pytest runs in `importlib` import mode |
 
 The full text of each record, with context and consequences, is maintained in `docs/decisions.md`.
 

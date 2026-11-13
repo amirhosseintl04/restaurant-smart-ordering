@@ -1,0 +1,67 @@
+[project]
+name = "restaurant-smart-ordering"
+version = "0.1.0"
+description = "Multi-tenant smart ordering from Persian chat (uv workspace root, ADR-12)"
+requires-python = ">=3.12,<3.13"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "ruff>=0.8",
+    "pytest>=8",
+    # The root is virtual, so `uv sync` installs members only when the root depends on them.
+    # Listing them here installs every member (editable) for `uv run pytest`.
+    "platform-lib",
+    "identity-service",
+    "restaurant-service",
+    "catalog-service",
+    "conversation-service",
+    "order-service",
+    "notification-service",
+    "analytics-service",
+    "bale-adapter",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["libs/*", "services/*", "adapters/*"]
+
+[tool.uv.sources]
+platform-lib = { workspace = true }
+identity-service = { workspace = true }
+restaurant-service = { workspace = true }
+catalog-service = { workspace = true }
+conversation-service = { workspace = true }
+order-service = { workspace = true }
+notification-service = { workspace = true }
+analytics-service = { workspace = true }
+bale-adapter = { workspace = true }
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["libs/*/src", "services/*/src", "adapters/*/src"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "N"]
+
+[tool.ruff.lint.isort]
+known-first-party = [
+    "platform_lib",
+    "identity_service",
+    "restaurant_service",
+    "catalog_service",
+    "conversation_service",
+    "order_service",
+    "notification_service",
+    "analytics_service",
+    "bale_adapter",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["libs", "services", "adapters"]
+# Test folders have no __init__.py and share basenames (tests/test_package.py) across members;
+# importlib mode keeps them from colliding in sys.modules.
+addopts = ["--import-mode=importlib"]

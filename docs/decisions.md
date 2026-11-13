@@ -159,6 +159,28 @@ guardrails or the technology stack needs a new ADR and the human's approval befo
 - **Decision:** Pending.
 - **Consequences:** Pending.
 
+## ADR-14: src layout for every workspace member
+
+- **Status:** Accepted, 2026-11-13
+- **Context:** SAD 12.4 v1.0 drew each service as a flat folder with `api/`, `application/`,
+  `domain/`, `infrastructure/` and `tests/` directly inside it. Task I1-01 created the uv
+  workspace (ADR-12), whose default and recommended layout places the package under `src/`.
+  With a flat layout a package is importable from the repository working directory without
+  being installed, which lets tests pass against the wrong copy and makes accidental
+  cross-service imports easier (CLAUDE.md rule 3). Alternative considered: keep the flat layout
+  as drawn in the SAD.
+- **Decision:** Every workspace member uses src layout: `services/<name>/src/<name>_service/`
+  with the four layer subpackages, `libs/platform/src/platform_lib/` (named to avoid shadowing
+  the standard-library `platform` module), `adapters/bale/src/bale_adapter/`. `tests/` sits
+  beside `src/` without `__init__.py`; pytest runs with `--import-mode=importlib`. SAD 12.4 and
+  CLAUDE.md are updated to this layout; the structural acceptance test in
+  `libs/platform/tests/test_workspace_layout.py` enforces it.
+- **Consequences:** A package is importable only when installed in the workspace environment,
+  so the environment is the single import path. Paths are one level deeper than the original
+  diagram. Test modules cannot import sibling test modules by bare name; shared fixtures belong
+  in `conftest.py`.
+- **Related:** SAD 12.4, ADR-12, CLAUDE.md rule 3, backlog I1-01.
+
 ---
 
 ## Template for new ADRs

@@ -58,8 +58,9 @@ implementer worktrees; the seven service skeletons are independent of each other
 | I1-16 | Acceptance and contract tests: Schemathesis against each service's OpenAPI, event schema tests for every publisher and consumer, SC-04 style test (Notification down, event delivered once after restart) | reviewer | I1-15 | All tests pass; report lists any SAD deviation with section numbers | — | [ ] |
 | I1-17 | Iteration 1 documentation: per-service READMEs, `CHANGELOG.md`, backlog statuses, ADRs for decisions taken during the iteration (e.g. outbox polling interval) | docs-writer | I1-16 | Docs match code; human approves merge | — | [ ] |
 
-Skeleton criteria for I1-06 to I1-12: service folder with `api/ application/ domain/
-infrastructure/ tests/`, FastAPI app built with the platform factory, Alembic baseline
+Skeleton criteria for I1-06 to I1-12: service folder in src layout (ADR-14) with
+`src/<name>_service/{api,application,domain,infrastructure}/` and `tests/` beside `src/`,
+FastAPI app built with the platform factory, Alembic baseline
 migration, Dockerfile based on Python 3.12, `/health/live` and `/health/ready` implemented
 (ready checks database and broker), unit tests passing, OpenAPI exported and identical to
 `contracts/openapi/<service>.yaml`, logs carry `correlation_id`.

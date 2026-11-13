@@ -35,11 +35,11 @@ Kong Gateway, Docker Compose, GitHub Actions.
 ## Repository layout
 
 ```text
-services/        one folder per microservice (api/ application/ domain/ infrastructure/ tests/)
-adapters/        channel adapters (Bale first)
+services/        one uv member per microservice: src/<name>_service/{api,application,domain,infrastructure}/ + tests/
+adapters/        channel adapters (Bale first, package bale_adapter)
 gateway/         Kong declarative configuration
 contracts/       OpenAPI specs and event JSON Schemas (written before code)
-libs/platform/   shared technical code only (logging, outbox relay, envelope, health)
+libs/platform/   package platform_lib: shared technical code only (logging, outbox relay, envelope, health)
 deploy/          docker-compose.yml and infrastructure init scripts
 docs/            SAD, ADR log, backlog
 .claude/         agent definitions, hooks and project settings for the AI workflow

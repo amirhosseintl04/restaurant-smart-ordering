@@ -33,7 +33,9 @@ You never merge, never push, and never touch code outside the task's scope.
   or which suggestion to show.
 - Code, identifiers, logs and comments in English; customer-facing strings in Persian.
 - No secrets in code or compose files; use environment variables listed in `.env.example`.
-- Each service is layered `api/ application/ domain/ infrastructure/ tests/`; domain rules are
+- Each service is a uv workspace member in src layout (ADR-14):
+  `services/<name>/src/<name>_service/{api,application,domain,infrastructure}/` with `tests/`
+  beside `src/`. Never place layer folders directly under `services/<name>/`. Domain rules are
   pure Python with unit tests.
 
 ## Workflow

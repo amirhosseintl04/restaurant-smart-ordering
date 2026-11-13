@@ -27,13 +27,14 @@ Read the relevant sections before any design or implementation decision and cite
 ## Repository layout (SAD 12.4)
 
 ```text
+pyproject.toml          uv workspace root; members libs/*, services/*, adapters/* (ADR-12)
 services/<name>/        identity, restaurant, catalog, conversation, order, notification, analytics
-  api/ application/ domain/ infrastructure/ tests/   (layering inside every service)
-adapters/bale/          channel adapter, no business logic
+  pyproject.toml  src/<name>_service/{api,application,domain,infrastructure}/  tests/   (src layout, ADR-14)
+adapters/bale/          channel adapter (src/bale_adapter/), no business logic
 gateway/kong.yml        declarative routes and plugins
 contracts/openapi/      one OpenAPI 3.1 spec per service
 contracts/events/       one JSON Schema per event + envelope
-libs/platform/          technical code only: logging, outbox relay, envelope, health, middleware
+libs/platform/          src/platform_lib/: technical code only (logging, outbox relay, envelope, health, middleware)
 deploy/                 docker-compose.yml and infra init scripts
 docs/                   architecture/SAD.md, decisions.md (ADRs), backlog.md
 .claude/                agents, hooks, project settings
