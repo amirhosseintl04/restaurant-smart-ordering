@@ -1,0 +1,438 @@
+openapi: 3.1.0
+info:
+  title: Conversation Service API
+  version: 0.1.0
+  summary: Dialogue, order extraction and suggestions (SAD 4.2).
+  description: |
+    Contract of the Conversation service for Iteration 1: the single channel-independent chat
+    endpoint (SAD 9.6, 11.2, 11.4, ADR-09) and the health checks (SAD 13.2).
+
+    Conventions (SAD 11.1): JSON with `snake_case` fields, integer amounts in Toman
+    (`currency: "IRT"`), RFC 9457 `application/problem+json` errors, `X-Correlation-Id` on
+    every request and response. `reply` and quick-reply labels are Persian; everything else
+    is English.
+
+    Tenancy (SAD 8.2): Kong authenticates the channel adapter by the restaurant API key, strips
+    any client-supplied `X-Tenant-Id` and sets it from the key. A request that reaches the
+    service without it is rejected with `400 tenant-required`.
+
+    Prices (SAD 9.5, ADR-07): every amount in a response is read from Order's response, never
+    produced by the LLM or accepted from the client.
+  license:
+    name: MIT
+    identifier: MIT
+servers:
+  - url: http://conversation-svc:8000
+    description: Internal Docker network (SAD 12.2). Public paths are reached through the gateway.
+security: []
+tags:
+  - name: health
+    description: Liveness and readiness probes (SAD 13.2).
+  - name: public
+    description: Routed by the gateway (SAD 11.2).
+paths:
+  /health/live:
+    get:
+      tags: [health]
+      operationId: health_live
+      summary: Process is alive
+      responses:
+        "200":
+          description: The process is running.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthLive"
+  /health/ready:
+    get:
+      tags: [health]
+      operationId: health_ready
+      summary: Database and broker are reachable
+      responses:
+        "200":
+          description: Ready to serve.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthReady"
+        "503":
+          description: At least one dependency is unreachable. Same body shape as 200.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthReady"
+  /v1/chat/messages:
+    post:
+      tags: [public]
+      operationId: post_chat_message
+      summary: Send a customer message or button action (channel adapter)
+      description: |
+        Processes one customer turn (SAD 9.1) and answers with the channel-independent
+        response of SAD 9.6. The body is either a text message or a button action; a button
+        action is handled deterministically, without the LLM (SAD 10.2).
+
+        The session is identified by tenant, `channel` and `external_user_id`.
+
+        `message_id` is forwarded to Order as the `Idempotency-Key`, so resending the same
+        message never creates a second order or applies an edit twice (SAD 6.3, 11.4).
+
+        Business outcomes are answered with `200` and a Persian `reply`: an unavailable item
+        or an ambiguous order becomes a clarification with quick replies (SAD 10.3), and an
+        LLM outage becomes the fallback mode (SAD 9.5). Only technical failures are problems.
+      security:
+        - GatewayApiKey: []
+      parameters:
+        - $ref: "#/components/parameters/TenantId"
+        - $ref: "#/components/parameters/CorrelationId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatMessageRequest"
+            examples:
+              text:
+                summary: Text message (SAD 11.4)
+                value:
+                  channel: bale
+                  external_user_id: "98123456"
+                  message_id: bale-msg-55120
+                  text: دو تا همبر مرغ با یه نوشابه خانواده
+              action:
+                summary: Button action (SAD 10.2)
+                value:
+                  channel: bale
+                  external_user_id: "98123456"
+                  message_id: bale-msg-55121
+                  action_id: accept_suggestion
+                  suggestion_id: sg_77
+      responses:
+        "200":
+          description: The reply to render in the channel.
+          headers:
+            X-Correlation-Id:
+              $ref: "#/components/headers/X-Correlation-Id"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatResponse"
+              example:
+                session_id: s_8842
+                reply: "سفارشت ثبت شد: ۲ همبرگر مرغ و ۱ نوشابه خانواده. سیب‌زمینی سرخ‌کرده امروز ۲۰٪ تخفیف داره و با همبرگر عالیه، اضافه‌ش کنم؟"
+                order:
+                  order_id: ord_501
+                  status: CREATED
+                  items:
+                    - { product_id: p_12, name: همبرگر مرغ, qty: 2, unit_price: 185000 }
+                    - { product_id: p_31, name: نوشابه خانواده, qty: 1, unit_price: 40000 }
+                  total: 410000
+                  currency: IRT
+                suggestion: { suggestion_id: sg_77, type: promotion, product_id: p_44 }
+                quick_replies:
+                  - { action_id: accept_suggestion, label: "آره، اضافه کن" }
+                  - { action_id: decline_suggestion, label: "نه، ممنون" }
+        "400":
+          $ref: "#/components/responses/TenantRequired"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "503":
+          $ref: "#/components/responses/UpstreamUnavailable"
+        default:
+          $ref: "#/components/responses/UnexpectedError"
+components:
+  securitySchemes:
+    GatewayApiKey:
+      type: apiKey
+      in: header
+      name: apikey
+      description: |
+        Per-restaurant API key of the channel adapter (SAD 11.4, 13.1). Validated by Kong
+        (`key-auth`), which resolves the tenant from it; this service never sees or checks it.
+  parameters:
+    TenantId:
+      name: X-Tenant-Id
+      in: header
+      required: true
+      description: Tenant (restaurant) of the request. Set by the gateway from the API key; a client-supplied value is stripped (SAD 8.2).
+      schema:
+        $ref: "#/components/schemas/Id"
+      example: rest_42
+    CorrelationId:
+      name: X-Correlation-Id
+      in: header
+      required: false
+      description: Correlation ID. Added by the gateway when the client sends none; generated by the service when absent (SAD 11.1, 13.2).
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+      example: c-7d1e3a90
+  headers:
+    X-Correlation-Id:
+      description: Correlation ID of the request (SAD 11.1).
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+  responses:
+    TenantRequired:
+      description: "`tenant-required`: the `X-Tenant-Id` header is missing or blank."
+      headers:
+        X-Correlation-Id:
+          $ref: "#/components/headers/X-Correlation-Id"
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+          example:
+            type: https://api.example.com/problems/tenant-required
+            title: Tenant required
+            status: 400
+            detail: The X-Tenant-Id header is missing.
+            instance: /v1/chat/messages
+            correlation_id: c-7d1e3a90
+    ValidationError:
+      description: "`validation-error`: a header or body field is missing or invalid, e.g. `text` longer than 500 characters (SAD 13.1) or both `text` and `action_id`."
+      headers:
+        X-Correlation-Id:
+          $ref: "#/components/headers/X-Correlation-Id"
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+          example:
+            type: https://api.example.com/problems/validation-error
+            title: Validation error
+            status: 422
+            detail: The request is not valid.
+            instance: /v1/chat/messages
+            correlation_id: c-7d1e3a90
+            errors:
+              - { pointer: body.text, detail: String should have at most 500 characters }
+    UpstreamUnavailable:
+      description: "`upstream-unavailable`: Order did not answer within 3 s or is unreachable (SAD 6.3). No order was placed or changed; the adapter may resend the same `message_id`."
+      headers:
+        X-Correlation-Id:
+          $ref: "#/components/headers/X-Correlation-Id"
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+          example:
+            type: https://api.example.com/problems/upstream-unavailable
+            title: Upstream unavailable
+            status: 503
+            detail: Order did not answer in time.
+            instance: /v1/chat/messages
+            correlation_id: c-7d1e3a90
+    UnexpectedError:
+      description: "`internal-error` or any other problem."
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+  schemas:
+    Id:
+      type: string
+      pattern: "^[A-Za-z0-9_-]{1,64}$"
+      description: Opaque, URL-safe identifier. Callers never parse it.
+    Money:
+      type: integer
+      minimum: 0
+      description: Integer amount in Toman (SAD 11.1).
+    Channel:
+      type: string
+      pattern: "^[a-z][a-z0-9_]{0,31}$"
+      description: Channel name. An open value, not an enum, so a new channel needs no change here (QA-M1).
+      examples: [bale]
+    ExternalUserId:
+      type: string
+      minLength: 1
+      maxLength: 128
+      description: The customer's identity in the channel, e.g. the Bale user ID (SAD 2.4).
+    MessageId:
+      type: string
+      minLength: 1
+      maxLength: 128
+      description: The channel's ID of this message or button press. Unique per tenant; used as the idempotency key towards Order.
+    ActionId:
+      type: string
+      enum: [accept_suggestion, decline_suggestion]
+      description: Button actions known in this version (SAD 9.6).
+    TextMessage:
+      type: object
+      additionalProperties: false
+      required: [channel, external_user_id, message_id, text]
+      properties:
+        channel:
+          $ref: "#/components/schemas/Channel"
+        external_user_id:
+          $ref: "#/components/schemas/ExternalUserId"
+        message_id:
+          $ref: "#/components/schemas/MessageId"
+        text:
+          type: string
+          minLength: 1
+          maxLength: 500
+          description: Free-form customer text, usually colloquial Persian. Capped at 500 characters (SAD 13.1).
+    ActionMessage:
+      type: object
+      additionalProperties: false
+      required: [channel, external_user_id, message_id, action_id, suggestion_id]
+      properties:
+        channel:
+          $ref: "#/components/schemas/Channel"
+        external_user_id:
+          $ref: "#/components/schemas/ExternalUserId"
+        message_id:
+          $ref: "#/components/schemas/MessageId"
+        action_id:
+          $ref: "#/components/schemas/ActionId"
+        suggestion_id:
+          $ref: "#/components/schemas/Id"
+          description: The `suggestion.suggestion_id` of the response that showed the button.
+    ChatMessageRequest:
+      description: Either a text message or a button action, never both (SAD 11.4).
+      oneOf:
+        - $ref: "#/components/schemas/TextMessage"
+        - $ref: "#/components/schemas/ActionMessage"
+    OrderStatus:
+      type: string
+      enum: [CREATED, ACCEPTED, PREPARING, READY, DELIVERED, CANCELLED]
+      description: Order lifecycle (SAD 10.5).
+    ChatOrderItem:
+      type: object
+      required: [product_id, name, qty, unit_price]
+      properties:
+        product_id:
+          $ref: "#/components/schemas/Id"
+        name:
+          type: string
+          minLength: 1
+        qty:
+          type: integer
+          minimum: 1
+        unit_price:
+          $ref: "#/components/schemas/Money"
+    ChatOrder:
+      type: object
+      description: The customer's order as returned by Order (SAD 9.6).
+      required: [order_id, status, items, total, currency]
+      properties:
+        order_id:
+          $ref: "#/components/schemas/Id"
+        status:
+          $ref: "#/components/schemas/OrderStatus"
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChatOrderItem"
+        total:
+          $ref: "#/components/schemas/Money"
+        currency:
+          const: IRT
+    Suggestion:
+      type: object
+      description: The suggestion offered in this reply, chosen by the rule-based engine (SAD 9.4).
+      required: [suggestion_id, type, product_id]
+      properties:
+        suggestion_id:
+          $ref: "#/components/schemas/Id"
+        type:
+          type: string
+          enum: [complement, promotion]
+        product_id:
+          $ref: "#/components/schemas/Id"
+    QuickReply:
+      type: object
+      required: [action_id, label]
+      properties:
+        action_id:
+          $ref: "#/components/schemas/ActionId"
+        label:
+          type: string
+          minLength: 1
+          maxLength: 64
+          description: Persian button label.
+    ChatResponse:
+      type: object
+      description: Channel-independent response (SAD 9.6). All five fields are always present.
+      required: [session_id, reply, order, suggestion, quick_replies]
+      properties:
+        session_id:
+          $ref: "#/components/schemas/Id"
+        reply:
+          type: string
+          minLength: 1
+          description: Persian text to show to the customer.
+        order:
+          description: The order this reply is about; null when the turn involved no order.
+          oneOf:
+            - $ref: "#/components/schemas/ChatOrder"
+            - type: "null"
+        suggestion:
+          description: At most one suggestion per reply (SAD 9.4); null when there is none.
+          oneOf:
+            - $ref: "#/components/schemas/Suggestion"
+            - type: "null"
+        quick_replies:
+          type: array
+          description: Buttons to render under the reply; empty when there are none.
+          items:
+            $ref: "#/components/schemas/QuickReply"
+    HealthLive:
+      type: object
+      required: [status]
+      properties:
+        status:
+          const: ok
+    HealthReady:
+      type: object
+      required: [status, checks]
+      properties:
+        status:
+          type: string
+          enum: [ok, unavailable]
+        checks:
+          type: object
+          required: [database, broker]
+          properties:
+            database:
+              type: string
+              enum: [ok, failed]
+            broker:
+              type: string
+              enum: [ok, failed]
+    Problem:
+      type: object
+      description: RFC 9457 problem details (SAD 11.1, 11.5).
+      required: [type, title, status, correlation_id]
+      properties:
+        type:
+          type: string
+          format: uri
+          description: "`https://api.example.com/problems/<slug>`; the slug identifies the problem."
+        title:
+          type: string
+        status:
+          type: integer
+          minimum: 400
+          maximum: 599
+        detail:
+          type: string
+        instance:
+          type: string
+        correlation_id:
+          type: string
+        errors:
+          type: array
+          description: Present on `validation-error`.
+          items:
+            type: object
+            required: [pointer, detail]
+            properties:
+              pointer:
+                type: string
+                description: Location of the invalid value, e.g. `body.text`.
+              detail:
+                type: string

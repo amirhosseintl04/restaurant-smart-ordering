@@ -1,0 +1,723 @@
+openapi: 3.1.0
+info:
+  title: Order Service API
+  version: 0.1.0
+  summary: Placing, validating and editing orders; order status (SAD 4.2).
+  description: |
+    Contract of the Order service for Iteration 1: the internal ordering API called by
+    Conversation (SAD 11.3), the staff order queue (SAD 11.2) and the health checks (SAD 13.2).
+
+    Conventions (SAD 11.1): JSON with `snake_case` fields, ISO-8601 UTC times, integer amounts
+    in Toman (`currency: "IRT"`), RFC 9457 `application/problem+json` errors, cursor pagination,
+    `X-Correlation-Id` on every request and response.
+
+    Tenancy (SAD 8.2): every `/v1` and `/internal` request carries `X-Tenant-Id`. The gateway
+    sets it on public requests; internal callers propagate it. A request without it is rejected
+    with `400 tenant-required`. Order ids of another tenant answer `404`.
+
+    Prices (SAD 6.4, QA-SEC2): no request carries a price. Order reads price and availability
+    from Catalog (`POST /internal/catalog/price-quote`, 2 s timeout) on every create and edit
+    and snapshots the unit price in the order.
+
+    `/internal/*` paths are reachable on the internal network only and are never routed by the
+    gateway. `/v1/*` paths are authenticated by Kong, not by this service.
+  license:
+    name: MIT
+    identifier: MIT
+servers:
+  - url: http://order-svc:8000
+    description: Internal Docker network (SAD 12.2). Public paths are reached through the gateway.
+security: []
+tags:
+  - name: health
+    description: Liveness and readiness probes (SAD 13.2).
+  - name: internal
+    description: Internal network only, not routed by the gateway (SAD 11.3).
+  - name: public
+    description: Routed by the gateway (SAD 11.2).
+paths:
+  /health/live:
+    get:
+      tags: [health]
+      operationId: health_live
+      summary: Process is alive
+      responses:
+        "200":
+          description: The process is running.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthLive"
+  /health/ready:
+    get:
+      tags: [health]
+      operationId: health_ready
+      summary: Database and broker are reachable
+      responses:
+        "200":
+          description: Ready to serve.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthReady"
+        "503":
+          description: At least one dependency is unreachable. Same body shape as 200.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthReady"
+  /internal/orders:
+    post:
+      tags: [internal]
+      operationId: create_order
+      summary: Create an order (Conversation → Order)
+      description: |
+        Validates the items against Catalog, snapshots the prices and stores the order with
+        status `CREATED` together with an `OrderCreated` outbox row in one transaction
+        (SAD 6.3, 10.1).
+
+        Idempotent on `Idempotency-Key` per tenant (SAD 6.3): Conversation sends the chat
+        `message_id`. A repeat with the same key and the same body returns `200` with the
+        order created the first time and publishes nothing. The same key with a different body
+        is rejected with `422 idempotency-key-reused`.
+
+        Each `product_id` may appear once in `items`.
+      parameters:
+        - $ref: "#/components/parameters/TenantId"
+        - $ref: "#/components/parameters/CorrelationId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOrderRequest"
+            example:
+              customer_ref: "bale:98123456"
+              items:
+                - { product_id: p_12, qty: 2 }
+                - { product_id: p_31, qty: 1 }
+      responses:
+        "201":
+          description: Order created.
+          headers:
+            X-Correlation-Id:
+              $ref: "#/components/headers/X-Correlation-Id"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+              examples:
+                order:
+                  $ref: "#/components/examples/OrderCreated"
+        "200":
+          description: Idempotent replay. The order created by the first request with this key.
+          headers:
+            X-Correlation-Id:
+              $ref: "#/components/headers/X-Correlation-Id"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+        "400":
+          $ref: "#/components/responses/TenantRequired"
+        "403":
+          $ref: "#/components/responses/RestaurantSuspended"
+        "409":
+          $ref: "#/components/responses/ItemUnavailable"
+        "422":
+          description: |
+            One of: `validation-error` (malformed request, missing `Idempotency-Key`, duplicate
+            `product_id`), `unknown-item` (a product is not on this restaurant's menu, with
+            `unknown_items`), `idempotency-key-reused`.
+          headers:
+            X-Correlation-Id:
+              $ref: "#/components/headers/X-Correlation-Id"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+              examples:
+                unknown-item:
+                  value:
+                    type: https://api.example.com/problems/unknown-item
+                    title: Unknown item
+                    status: 422
+                    detail: Product p_999 is not on the menu.
+                    instance: /internal/orders
+                    correlation_id: c-7d1e3a90
+                    unknown_items: [p_999]
+        "503":
+          $ref: "#/components/responses/UpstreamUnavailable"
+        default:
+          $ref: "#/components/responses/UnexpectedError"
+  /internal/orders/{order_id}:
+    get:
+      tags: [internal]
+      operationId: get_order
+      summary: Read an order (Conversation → Order)
+      description: Used to answer order status questions (SAD 9.2, 11.3).
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+        - $ref: "#/components/parameters/TenantId"
+        - $ref: "#/components/parameters/CorrelationId"
+      responses:
+        "200":
+          description: The order.
+          headers:
+            X-Correlation-Id:
+              $ref: "#/components/headers/X-Correlation-Id"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+        "400":
+          $ref: "#/components/responses/TenantRequired"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        default:
+          $ref: "#/components/responses/UnexpectedError"
+  /internal/orders/{order_id}/items:
+    patch:
+      tags: [internal]
+      operationId: update_order_items
+      summary: Add, remove or change item quantities (Conversation → Order)
+      description: |
+        Applies all `changes` in order, atomically, to an order in status `CREATED`
+        (SAD 10.5), re-quotes the resulting items from Catalog and stores the order with an
+        `OrderUpdated` outbox row in one transaction (SAD 10.2).
+
+        - `add`: adds the quantity; merges into the existing line if the product is already
+          in the order.
+        - `remove`: removes the whole line.
+        - `set_quantity`: sets the quantity of an existing line.
+
+        Idempotent on `Idempotency-Key` per tenant, like order creation: a repeat with the same
+        key and body returns the result of the first request and changes nothing.
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+        - $ref: "#/components/parameters/TenantId"
+        - $ref: "#/components/parameters/CorrelationId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateOrderItemsRequest"
+            example:
+              changes:
+                - { op: add, product_id: p_44, qty: 1 }
+      responses:
+        "200":
+          description: The order after the change.
+          headers:
+            X-Correlation-Id:
+              $ref: "#/components/headers/X-Correlation-Id"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+        "400":
+          $ref: "#/components/responses/TenantRequired"
+        "403":
+          $ref: "#/components/responses/RestaurantSuspended"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: |
+            One of: `order-not-editable` (status is not `CREATED`, with `order_status`),
+            `item-unavailable` (with `unavailable_items`).
+          headers:
+            X-Correlation-Id:
+              $ref: "#/components/headers/X-Correlation-Id"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+              examples:
+                order-not-editable:
+                  value:
+                    type: https://api.example.com/problems/order-not-editable
+                    title: Order not editable
+                    status: 409
+                    detail: Order ord_501 is ACCEPTED; items can be edited only in CREATED.
+                    instance: /internal/orders/ord_501/items
+                    correlation_id: c-91b2f4c7
+                    order_status: ACCEPTED
+        "422":
+          description: |
+            One of: `validation-error`, `unknown-item` (with `unknown_items`),
+            `item-not-in-order` (a `remove` or `set_quantity` names a product that is not in
+            the order, with `missing_items`), `empty-order` (the changes would leave no item;
+            the order must be cancelled instead), `idempotency-key-reused`.
+          headers:
+            X-Correlation-Id:
+              $ref: "#/components/headers/X-Correlation-Id"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "503":
+          $ref: "#/components/responses/UpstreamUnavailable"
+        default:
+          $ref: "#/components/responses/UnexpectedError"
+  /v1/orders:
+    get:
+      tags: [public]
+      operationId: list_orders
+      summary: Order queue filtered by status (staff)
+      description: |
+        Orders of the tenant, oldest first (a work queue), optionally filtered by status
+        (SAD 11.2, FR-07, QA-P2). Kong validates the staff JWT and sets `X-Tenant-Id` from its
+        `restaurant_id` claim.
+      security:
+        - GatewayJwt: []
+      parameters:
+        - $ref: "#/components/parameters/TenantId"
+        - $ref: "#/components/parameters/CorrelationId"
+        - name: status
+          in: query
+          required: false
+          description: Return only orders in this status.
+          schema:
+            $ref: "#/components/schemas/OrderStatus"
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: One page of orders.
+          headers:
+            X-Correlation-Id:
+              $ref: "#/components/headers/X-Correlation-Id"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderList"
+        "400":
+          $ref: "#/components/responses/TenantRequired"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        default:
+          $ref: "#/components/responses/UnexpectedError"
+components:
+  securitySchemes:
+    GatewayJwt:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        RS256 staff token issued by Identity (SAD 13.1). Validated by Kong, which also applies
+        the basic role check (SAD 6.2); this service does not inspect the token.
+  parameters:
+    TenantId:
+      name: X-Tenant-Id
+      in: header
+      required: true
+      description: Tenant (restaurant) of the request. Set by the gateway, propagated by internal callers (SAD 8.2).
+      schema:
+        $ref: "#/components/schemas/Id"
+      example: rest_42
+    CorrelationId:
+      name: X-Correlation-Id
+      in: header
+      required: false
+      description: Correlation ID. Added by the gateway and propagated by internal callers; generated by the service when absent (SAD 11.1, 13.2).
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+      example: c-7d1e3a90
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: The chat `message_id` that caused the request (SAD 6.3, 11.4). Unique per tenant.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 255
+      example: bale-msg-55120
+    OrderId:
+      name: order_id
+      in: path
+      required: true
+      schema:
+        $ref: "#/components/schemas/Id"
+      example: ord_501
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      description: Opaque cursor taken from `next_cursor` of the previous page (SAD 11.1).
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 512
+    Limit:
+      name: limit
+      in: query
+      required: false
+      description: Page size.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+  headers:
+    X-Correlation-Id:
+      description: Correlation ID of the request (SAD 11.1).
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+  responses:
+    TenantRequired:
+      description: "`tenant-required`: the `X-Tenant-Id` header is missing or blank."
+      headers:
+        X-Correlation-Id:
+          $ref: "#/components/headers/X-Correlation-Id"
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+          example:
+            type: https://api.example.com/problems/tenant-required
+            title: Tenant required
+            status: 400
+            detail: The X-Tenant-Id header is missing.
+            instance: /internal/orders
+            correlation_id: c-7d1e3a90
+    ValidationError:
+      description: "`validation-error`: a header, parameter or body field is missing or invalid."
+      headers:
+        X-Correlation-Id:
+          $ref: "#/components/headers/X-Correlation-Id"
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+          example:
+            type: https://api.example.com/problems/validation-error
+            title: Validation error
+            status: 422
+            detail: The request is not valid.
+            instance: /v1/orders
+            correlation_id: c-7d1e3a90
+            errors:
+              - { pointer: query.limit, detail: Input should be less than or equal to 100 }
+    NotFound:
+      description: "`not-found`: no such order for this tenant."
+      headers:
+        X-Correlation-Id:
+          $ref: "#/components/headers/X-Correlation-Id"
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+          example:
+            type: https://api.example.com/problems/not-found
+            title: Not found
+            status: 404
+            detail: Order ord_999 does not exist.
+            instance: /internal/orders/ord_999
+            correlation_id: c-7d1e3a90
+    RestaurantSuspended:
+      description: "`restaurant-suspended`: the restaurant does not accept new or changed orders (SAD 6.2)."
+      headers:
+        X-Correlation-Id:
+          $ref: "#/components/headers/X-Correlation-Id"
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+          example:
+            type: https://api.example.com/problems/restaurant-suspended
+            title: Restaurant suspended
+            status: 403
+            detail: Restaurant rest_42 is suspended.
+            instance: /internal/orders
+            correlation_id: c-7d1e3a90
+    ItemUnavailable:
+      description: "`item-unavailable`: Catalog reports at least one item as unavailable (SAD 10.3, 11.5)."
+      headers:
+        X-Correlation-Id:
+          $ref: "#/components/headers/X-Correlation-Id"
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+          example:
+            type: https://api.example.com/problems/item-unavailable
+            title: Item unavailable
+            status: 409
+            detail: Product p_12 is not available right now.
+            instance: /internal/orders
+            correlation_id: c-7d1e3a90
+            unavailable_items: [p_12]
+    UpstreamUnavailable:
+      description: "`upstream-unavailable`: Catalog did not answer within 2 s or is unreachable (SAD 6.3). Nothing was stored; the caller may retry with the same `Idempotency-Key`."
+      headers:
+        X-Correlation-Id:
+          $ref: "#/components/headers/X-Correlation-Id"
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+          example:
+            type: https://api.example.com/problems/upstream-unavailable
+            title: Upstream unavailable
+            status: 503
+            detail: Catalog did not answer in time.
+            instance: /internal/orders
+            correlation_id: c-7d1e3a90
+    UnexpectedError:
+      description: "`internal-error` or any other problem."
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+  examples:
+    OrderCreated:
+      summary: The order of SAD 10.1
+      value:
+        order_id: ord_501
+        status: CREATED
+        items:
+          - { product_id: p_12, name: همبرگر مرغ, qty: 2, unit_price: 185000 }
+          - { product_id: p_31, name: نوشابه خانواده, qty: 1, unit_price: 40000 }
+        total: 410000
+        currency: IRT
+        customer_ref: "bale:98123456"
+        customer_id: null
+        created_at: "2026-11-13T10:00:00Z"
+        updated_at: "2026-11-13T10:00:00Z"
+  schemas:
+    Id:
+      type: string
+      pattern: "^[A-Za-z0-9_-]{1,64}$"
+      description: Opaque, URL-safe identifier. Callers never parse it.
+    Money:
+      type: integer
+      minimum: 0
+      description: Integer amount in Toman (SAD 11.1).
+    CustomerRef:
+      type: string
+      pattern: "^[a-z][a-z0-9_]{0,31}:.{1,128}$"
+      description: Channel identity of the customer as `<channel>:<external_user_id>`.
+      examples: ["bale:98123456"]
+    OrderStatus:
+      type: string
+      enum: [CREATED, ACCEPTED, PREPARING, READY, DELIVERED, CANCELLED]
+      description: Order lifecycle (SAD 10.5).
+    Quantity:
+      type: integer
+      minimum: 1
+      maximum: 20
+      description: Quantity of one line in a request (SAD 9.3).
+    OrderItemInput:
+      type: object
+      additionalProperties: false
+      required: [product_id, qty]
+      properties:
+        product_id:
+          $ref: "#/components/schemas/Id"
+        qty:
+          $ref: "#/components/schemas/Quantity"
+    CreateOrderRequest:
+      type: object
+      additionalProperties: false
+      required: [customer_ref, items]
+      properties:
+        customer_ref:
+          $ref: "#/components/schemas/CustomerRef"
+        customer_id:
+          description: Member-customer id from Identity, when the customer is a member (SAD 6.1).
+          oneOf:
+            - $ref: "#/components/schemas/Id"
+            - type: "null"
+        items:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items:
+            $ref: "#/components/schemas/OrderItemInput"
+    AddItemChange:
+      type: object
+      additionalProperties: false
+      required: [op, product_id, qty]
+      properties:
+        op:
+          const: add
+        product_id:
+          $ref: "#/components/schemas/Id"
+        qty:
+          $ref: "#/components/schemas/Quantity"
+    RemoveItemChange:
+      type: object
+      additionalProperties: false
+      required: [op, product_id]
+      properties:
+        op:
+          const: remove
+        product_id:
+          $ref: "#/components/schemas/Id"
+    SetQuantityChange:
+      type: object
+      additionalProperties: false
+      required: [op, product_id, qty]
+      properties:
+        op:
+          const: set_quantity
+        product_id:
+          $ref: "#/components/schemas/Id"
+        qty:
+          $ref: "#/components/schemas/Quantity"
+    UpdateOrderItemsRequest:
+      type: object
+      additionalProperties: false
+      required: [changes]
+      properties:
+        changes:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items:
+            oneOf:
+              - $ref: "#/components/schemas/AddItemChange"
+              - $ref: "#/components/schemas/RemoveItemChange"
+              - $ref: "#/components/schemas/SetQuantityChange"
+            discriminator:
+              propertyName: op
+              mapping:
+                add: "#/components/schemas/AddItemChange"
+                remove: "#/components/schemas/RemoveItemChange"
+                set_quantity: "#/components/schemas/SetQuantityChange"
+    OrderItem:
+      type: object
+      required: [product_id, name, qty, unit_price]
+      properties:
+        product_id:
+          $ref: "#/components/schemas/Id"
+        name:
+          type: string
+          minLength: 1
+          description: Product name snapshotted from the Catalog price quote.
+        qty:
+          type: integer
+          minimum: 1
+        unit_price:
+          $ref: "#/components/schemas/Money"
+          description: Unit price snapshotted at placement time, promotion applied (SAD 6.4).
+    Order:
+      type: object
+      required: [order_id, status, items, total, currency, customer_ref, created_at, updated_at]
+      properties:
+        order_id:
+          $ref: "#/components/schemas/Id"
+        status:
+          $ref: "#/components/schemas/OrderStatus"
+        items:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/OrderItem"
+        total:
+          $ref: "#/components/schemas/Money"
+        currency:
+          const: IRT
+        customer_ref:
+          $ref: "#/components/schemas/CustomerRef"
+        customer_id:
+          oneOf:
+            - $ref: "#/components/schemas/Id"
+            - type: "null"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    OrderList:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Order"
+        next_cursor:
+          type: [string, "null"]
+          description: Cursor of the next page; null on the last page.
+    HealthLive:
+      type: object
+      required: [status]
+      properties:
+        status:
+          const: ok
+    HealthReady:
+      type: object
+      required: [status, checks]
+      properties:
+        status:
+          type: string
+          enum: [ok, unavailable]
+        checks:
+          type: object
+          required: [database, broker]
+          properties:
+            database:
+              type: string
+              enum: [ok, failed]
+            broker:
+              type: string
+              enum: [ok, failed]
+    Problem:
+      type: object
+      description: RFC 9457 problem details (SAD 11.1, 11.5). Problem types add extension members such as `unavailable_items`.
+      required: [type, title, status, correlation_id]
+      properties:
+        type:
+          type: string
+          format: uri
+          description: "`https://api.example.com/problems/<slug>`; the slug identifies the problem."
+        title:
+          type: string
+        status:
+          type: integer
+          minimum: 400
+          maximum: 599
+        detail:
+          type: string
+        instance:
+          type: string
+        correlation_id:
+          type: string
+        errors:
+          type: array
+          description: Present on `validation-error`.
+          items:
+            type: object
+            required: [pointer, detail]
+            properties:
+              pointer:
+                type: string
+                description: Location of the invalid value, e.g. `body.items.0.qty`.
+              detail:
+                type: string
+        unavailable_items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Id"
+        unknown_items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Id"
+        missing_items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Id"
+        order_status:
+          $ref: "#/components/schemas/OrderStatus"

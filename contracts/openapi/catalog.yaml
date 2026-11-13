@@ -1,0 +1,485 @@
+openapi: 3.1.0
+info:
+  title: Catalog Service API
+  version: 0.1.0
+  summary: Menu, prices, availability, promotions and complements (SAD 4.2).
+  description: |
+    Contract of the Catalog service for Iteration 1: the internal price quote used by Order,
+    the menu snapshot used by Conversation (SAD 11.3) and the health checks (SAD 13.2). The
+    public menu and promotion endpoints of SAD 11.2 are added in Iteration 2 and 3.
+
+    Catalog is the only source of truth for price and availability (SAD 6.4, QA-SEC2).
+
+    Conventions (SAD 11.1): JSON with `snake_case` fields, ISO-8601 UTC times, integer amounts
+    in Toman (`currency: "IRT"`), RFC 9457 `application/problem+json` errors, cursor pagination,
+    `X-Correlation-Id` on every request and response.
+
+    Tenancy (SAD 8.2): every `/internal` request carries `X-Tenant-Id`, propagated by the
+    caller. A request without it is rejected with `400 tenant-required`. Only the menu of that
+    tenant is visible.
+
+    `/internal/*` paths are reachable on the internal network only and are never routed by the
+    gateway.
+  license:
+    name: MIT
+    identifier: MIT
+servers:
+  - url: http://catalog-svc:8000
+    description: Internal Docker network (SAD 12.2).
+security: []
+tags:
+  - name: health
+    description: Liveness and readiness probes (SAD 13.2).
+  - name: internal
+    description: Internal network only, not routed by the gateway (SAD 11.3).
+paths:
+  /health/live:
+    get:
+      tags: [health]
+      operationId: health_live
+      summary: Process is alive
+      responses:
+        "200":
+          description: The process is running.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthLive"
+  /health/ready:
+    get:
+      tags: [health]
+      operationId: health_ready
+      summary: Database and broker are reachable
+      responses:
+        "200":
+          description: Ready to serve.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthReady"
+        "503":
+          description: At least one dependency is unreachable. Same body shape as 200.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthReady"
+  /internal/catalog/price-quote:
+    post:
+      tags: [internal]
+      operationId: quote_prices
+      summary: Valid price, availability and promotion for items (Order → Catalog)
+      description: |
+        Answers for every requested product of the tenant: name, availability, list price and
+        the unit price to charge now, with the active promotion applied (SAD 10.1 step 10).
+        Products that are not on the tenant's menu are listed in `unknown_items`.
+
+        The quote itself always answers `200`; an unavailable or unknown product is data, not
+        an error. Order decides what to do with it (`409 item-unavailable`,
+        `422 unknown-item`). Read-only: it stores nothing and publishes nothing.
+
+        `qty` does not influence the unit price in version 1; it is part of the request so
+        that Catalog stays the only pricing authority if quantity-based promotions appear.
+      parameters:
+        - $ref: "#/components/parameters/TenantId"
+        - $ref: "#/components/parameters/CorrelationId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PriceQuoteRequest"
+            example:
+              items:
+                - { product_id: p_12, qty: 2 }
+                - { product_id: p_44, qty: 1 }
+      responses:
+        "200":
+          description: The quote.
+          headers:
+            X-Correlation-Id:
+              $ref: "#/components/headers/X-Correlation-Id"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PriceQuote"
+              example:
+                currency: IRT
+                quoted_at: "2026-11-13T10:01:20Z"
+                items:
+                  - product_id: p_12
+                    name: همبرگر مرغ
+                    is_available: true
+                    list_price: 185000
+                    unit_price: 185000
+                    promotion: null
+                  - product_id: p_44
+                    name: سیب‌زمینی سرخ‌کرده
+                    is_available: true
+                    list_price: 60000
+                    unit_price: 48000
+                    promotion: { promotion_id: promo_7, discount: 20 }
+                unknown_items: []
+        "400":
+          $ref: "#/components/responses/TenantRequired"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        default:
+          $ref: "#/components/responses/UnexpectedError"
+  /internal/catalog/snapshot:
+    get:
+      tags: [internal]
+      operationId: get_catalog_snapshot
+      summary: Full menu of the tenant (Conversation → Catalog)
+      description: |
+        Everything Conversation needs to rebuild its `menu_projection` from scratch, for
+        initial setup or recovery (SAD 8.3, ADR-05, ADR-08). Each item carries the same state
+        that `MenuItemUpdated`, `MenuItemAvailabilityChanged` and `PromotionActivated` carry.
+        Items are ordered by `product_id`.
+      parameters:
+        - $ref: "#/components/parameters/TenantId"
+        - $ref: "#/components/parameters/CorrelationId"
+        - $ref: "#/components/parameters/Cursor"
+        - name: limit
+          in: query
+          required: false
+          description: Page size. The default covers a whole menu (SAD 2.4, fewer than 300 items).
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 500
+      responses:
+        "200":
+          description: One page of the menu.
+          headers:
+            X-Correlation-Id:
+              $ref: "#/components/headers/X-Correlation-Id"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CatalogSnapshot"
+              example:
+                generated_at: "2026-11-13T07:31:00Z"
+                items:
+                  - product_id: p_12
+                    name: همبرگر مرغ
+                    aliases: [همبر مرغ, برگر مرغ, چیکن برگر]
+                    description: فیله مرغ گریل‌شده، کاهو، گوجه و سس مخصوص
+                    category: برگر
+                    price: 185000
+                    is_available: true
+                    active_promotion: null
+                    complements:
+                      - { product_id: p_44, priority: 1 }
+                      - { product_id: p_31, priority: 2 }
+                  - product_id: p_44
+                    name: سیب‌زمینی سرخ‌کرده
+                    aliases: [سیب زمینی, فرنچ فرایز]
+                    description: ""
+                    category: پیش‌غذا
+                    price: 60000
+                    is_available: true
+                    active_promotion:
+                      promotion_id: promo_7
+                      discount: 20
+                      valid_until: "2026-11-13T20:30:00Z"
+                    complements: []
+                next_cursor: null
+        "400":
+          $ref: "#/components/responses/TenantRequired"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        default:
+          $ref: "#/components/responses/UnexpectedError"
+components:
+  parameters:
+    TenantId:
+      name: X-Tenant-Id
+      in: header
+      required: true
+      description: Tenant (restaurant) of the request, propagated by the internal caller (SAD 8.2).
+      schema:
+        $ref: "#/components/schemas/Id"
+      example: rest_42
+    CorrelationId:
+      name: X-Correlation-Id
+      in: header
+      required: false
+      description: Correlation ID, propagated by internal callers; generated by the service when absent (SAD 11.1, 13.2).
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+      example: c-7d1e3a90
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      description: Opaque cursor taken from `next_cursor` of the previous page (SAD 11.1).
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 512
+  headers:
+    X-Correlation-Id:
+      description: Correlation ID of the request (SAD 11.1).
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+  responses:
+    TenantRequired:
+      description: "`tenant-required`: the `X-Tenant-Id` header is missing or blank."
+      headers:
+        X-Correlation-Id:
+          $ref: "#/components/headers/X-Correlation-Id"
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+          example:
+            type: https://api.example.com/problems/tenant-required
+            title: Tenant required
+            status: 400
+            detail: The X-Tenant-Id header is missing.
+            instance: /internal/catalog/price-quote
+            correlation_id: c-7d1e3a90
+    ValidationError:
+      description: "`validation-error`: a header, parameter or body field is missing or invalid."
+      headers:
+        X-Correlation-Id:
+          $ref: "#/components/headers/X-Correlation-Id"
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+          example:
+            type: https://api.example.com/problems/validation-error
+            title: Validation error
+            status: 422
+            detail: The request is not valid.
+            instance: /internal/catalog/price-quote
+            correlation_id: c-7d1e3a90
+            errors:
+              - { pointer: body.items.0.qty, detail: Input should be greater than or equal to 1 }
+    UnexpectedError:
+      description: "`internal-error` or any other problem."
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+  schemas:
+    Id:
+      type: string
+      pattern: "^[A-Za-z0-9_-]{1,64}$"
+      description: Opaque, URL-safe identifier. Callers never parse it.
+    Money:
+      type: integer
+      minimum: 0
+      description: Integer amount in Toman (SAD 11.1).
+    DiscountPercent:
+      type: integer
+      minimum: 1
+      maximum: 100
+      description: Discount as a percentage of the list price (SAD 9.4).
+    PriceQuoteRequest:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items:
+            type: object
+            additionalProperties: false
+            required: [product_id, qty]
+            properties:
+              product_id:
+                $ref: "#/components/schemas/Id"
+              qty:
+                type: integer
+                minimum: 1
+    AppliedPromotion:
+      type: object
+      required: [promotion_id, discount]
+      properties:
+        promotion_id:
+          $ref: "#/components/schemas/Id"
+        discount:
+          $ref: "#/components/schemas/DiscountPercent"
+    QuotedItem:
+      type: object
+      required: [product_id, name, is_available, list_price, unit_price, promotion]
+      properties:
+        product_id:
+          $ref: "#/components/schemas/Id"
+        name:
+          type: string
+          minLength: 1
+        is_available:
+          type: boolean
+        list_price:
+          $ref: "#/components/schemas/Money"
+          description: Menu price without promotion.
+        unit_price:
+          $ref: "#/components/schemas/Money"
+          description: Price to charge per unit now, with the active promotion applied. Order snapshots this value.
+        promotion:
+          description: The promotion applied to `unit_price`; null when none is active.
+          oneOf:
+            - $ref: "#/components/schemas/AppliedPromotion"
+            - type: "null"
+    PriceQuote:
+      type: object
+      required: [currency, quoted_at, items, unknown_items]
+      properties:
+        currency:
+          const: IRT
+        quoted_at:
+          type: string
+          format: date-time
+        items:
+          type: array
+          description: One entry per requested product that is on the tenant's menu.
+          items:
+            $ref: "#/components/schemas/QuotedItem"
+        unknown_items:
+          type: array
+          description: Requested products that are not on the tenant's menu.
+          items:
+            $ref: "#/components/schemas/Id"
+    ActivePromotion:
+      type: object
+      required: [promotion_id, discount, valid_until]
+      properties:
+        promotion_id:
+          $ref: "#/components/schemas/Id"
+        discount:
+          $ref: "#/components/schemas/DiscountPercent"
+        valid_until:
+          type: string
+          format: date-time
+    Complement:
+      type: object
+      required: [product_id, priority]
+      properties:
+        product_id:
+          $ref: "#/components/schemas/Id"
+        priority:
+          type: integer
+          minimum: 1
+          description: Manager-set rank; 1 is suggested first (SAD 9.4).
+    SnapshotItem:
+      type: object
+      description: One menu item with every field of `menu_projection` that Catalog owns (SAD 8.3).
+      required:
+        - product_id
+        - name
+        - aliases
+        - description
+        - category
+        - price
+        - is_available
+        - active_promotion
+        - complements
+      properties:
+        product_id:
+          $ref: "#/components/schemas/Id"
+        name:
+          type: string
+          minLength: 1
+        aliases:
+          type: array
+          items:
+            type: string
+            minLength: 1
+        description:
+          type: string
+        category:
+          type: string
+          minLength: 1
+        price:
+          $ref: "#/components/schemas/Money"
+          description: List price, for display only (SAD 8.3).
+        is_available:
+          type: boolean
+        active_promotion:
+          oneOf:
+            - $ref: "#/components/schemas/ActivePromotion"
+            - type: "null"
+        complements:
+          type: array
+          items:
+            $ref: "#/components/schemas/Complement"
+    CatalogSnapshot:
+      type: object
+      required: [generated_at, items, next_cursor]
+      properties:
+        generated_at:
+          type: string
+          format: date-time
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/SnapshotItem"
+        next_cursor:
+          type: [string, "null"]
+          description: Cursor of the next page; null on the last page.
+    HealthLive:
+      type: object
+      required: [status]
+      properties:
+        status:
+          const: ok
+    HealthReady:
+      type: object
+      required: [status, checks]
+      properties:
+        status:
+          type: string
+          enum: [ok, unavailable]
+        checks:
+          type: object
+          required: [database, broker]
+          properties:
+            database:
+              type: string
+              enum: [ok, failed]
+            broker:
+              type: string
+              enum: [ok, failed]
+    Problem:
+      type: object
+      description: RFC 9457 problem details (SAD 11.1, 11.5).
+      required: [type, title, status, correlation_id]
+      properties:
+        type:
+          type: string
+          format: uri
+          description: "`https://api.example.com/problems/<slug>`; the slug identifies the problem."
+        title:
+          type: string
+        status:
+          type: integer
+          minimum: 400
+          maximum: 599
+        detail:
+          type: string
+        instance:
+          type: string
+        correlation_id:
+          type: string
+        errors:
+          type: array
+          description: Present on `validation-error`.
+          items:
+            type: object
+            required: [pointer, detail]
+            properties:
+              pointer:
+                type: string
+                description: Location of the invalid value, e.g. `body.items.0.qty`.
+              detail:
+                type: string

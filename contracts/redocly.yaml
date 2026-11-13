@@ -1,0 +1,6 @@
+# Lint configuration for the OpenAPI contracts: npx @redocly/cli lint --config contracts/redocly.yaml contracts/openapi/*.yaml
+extends:
+  - recommended
+rules:
+  # Health probes answer 200 or 503 only; every /v1 and /internal operation lists its problems.
+  operation-4xx-response: off

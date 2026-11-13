@@ -1,0 +1,77 @@
+openapi: 3.1.0
+info:
+  title: Analytics Service API
+  version: 0.1.0
+  summary: Sales and suggestion-impact reports (SAD 4.2).
+  description: |
+    Contract of the Analytics service for Iteration 1: the health checks only (SAD 13.2). The
+    public report endpoints of SAD 11.2 are added in Iteration 4.
+
+    It consumes `order.*`, `suggestion.*` and `customer.*` from the queue `analytics.q` and is
+    idempotent on `event_id` (`contracts/events/`, SAD 6.3, 7.3).
+  license:
+    name: MIT
+    identifier: MIT
+servers:
+  - url: http://analytics-svc:8000
+    description: Internal Docker network (SAD 12.2).
+security: []
+tags:
+  - name: health
+    description: Liveness and readiness probes (SAD 13.2).
+paths:
+  /health/live:
+    get:
+      tags: [health]
+      operationId: health_live
+      summary: Process is alive
+      responses:
+        "200":
+          description: The process is running.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthLive"
+  /health/ready:
+    get:
+      tags: [health]
+      operationId: health_ready
+      summary: Database and broker are reachable
+      responses:
+        "200":
+          description: Ready to serve.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthReady"
+        "503":
+          description: At least one dependency is unreachable. Same body shape as 200.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthReady"
+components:
+  schemas:
+    HealthLive:
+      type: object
+      required: [status]
+      properties:
+        status:
+          const: ok
+    HealthReady:
+      type: object
+      required: [status, checks]
+      properties:
+        status:
+          type: string
+          enum: [ok, unavailable]
+        checks:
+          type: object
+          required: [database, broker]
+          properties:
+            database:
+              type: string
+              enum: [ok, failed]
+            broker:
+              type: string
+              enum: [ok, failed]
