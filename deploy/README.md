@@ -25,9 +25,25 @@ workspace, ADR-12, ADR-14), listens on container port 8000 and has a healthcheck
 
 ## Ports
 
-Only Kong's proxy is published, on host port `${KONG_PROXY_PORT}` (SAD 8.2, 13.1). The Kong
-admin API listens on the container loopback only. PostgreSQL, RabbitMQ (AMQP and management UI)
-and the services are reachable only on the `internal` network.
+Only Kong's proxy is published, on `127.0.0.1:${KONG_PROXY_PORT}` (SAD 8.2, 13.1). Publishing
+Kong on the loopback is the development stand-in for the Nginx edge of SAD 12.1 and 12.2. The
+Kong admin API listens on the container loopback only and Kong Manager is off. PostgreSQL,
+RabbitMQ (AMQP and management UI) and the services are reachable only on the `internal` network.
+
+If port 8000 is busy, override it for one command (`KONG_PROXY_PORT=8080 docker compose ...`);
+a variable set in the shell wins over the env file. Use `-p <name>` for a throwaway project
+with its own containers, network and volumes (`docker compose -p scratch ... down -v` removes it).
+
+### Development override (opt-in)
+
+`docker-compose.dev.yml` is the single development exception to "only Kong publishes a host
+port". It publishes PostgreSQL (5432) and RabbitMQ (5672, management UI 15672) on `127.0.0.1`
+only, for the host-side integration tests of I1-05 and local debugging. It is never loaded by
+default and must never be used in production:
+
+```bash
+docker compose --env-file .env -f deploy/docker-compose.yml -f deploy/docker-compose.dev.yml up -d
+```
 
 ## Components
 
@@ -61,3 +77,8 @@ docker compose --env-file .env -f deploy/docker-compose.yml exec postgres \
 
 Re-running creates only what is missing and never changes an existing role's password. To
 apply new passwords, change them with `ALTER ROLE` or recreate the volume (`down -v`).
+
+The script checks all seven passwords before it creates anything. If a first init still fails
+(the container exits during start-up), PostgreSQL skips the init scripts on every later start,
+so fix `.env` and then either recreate the volume (`down -v`, then `up -d`) or re-run the
+script with the `exec` command above, which completes whatever is missing.

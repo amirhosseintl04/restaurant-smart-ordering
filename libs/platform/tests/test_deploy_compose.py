@@ -29,6 +29,7 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 COMPOSE_FILE = REPO_ROOT / "deploy" / "docker-compose.yml"
+DEV_OVERRIDE = REPO_ROOT / "deploy" / "docker-compose.dev.yml"
 ENV_EXAMPLE = REPO_ROOT / ".env.example"
 INIT_SCRIPT = REPO_ROOT / "deploy" / "postgres" / "init" / "01-create-service-databases.sh"
 KONG_CONFIG = REPO_ROOT / "gateway" / "kong.yml"
@@ -132,9 +133,9 @@ def _parse(lines: list[tuple[int, str]], pos: int, indent: int, anchors: dict):
     return {**merged, **own}, pos
 
 
-def _read_compose() -> dict:
+def _read_compose(path: Path = COMPOSE_FILE) -> dict:
     lines = []
-    for raw in COMPOSE_FILE.read_text(encoding="utf-8").splitlines():
+    for raw in path.read_text(encoding="utf-8").splitlines():
         stripped = raw.strip()
         if not stripped or stripped.startswith("#"):
             continue
@@ -211,7 +212,20 @@ def test_only_kong_publishes_a_host_port(services: dict) -> None:
     )
     ports = services["kong"]["ports"]
     assert len(ports) == 1, f"Kong publishes exactly its proxy port, found {ports}"
-    assert re.fullmatch(r"(127\.0\.0\.1:)?\$\{KONG_PROXY_PORT[^}]*\}:8000", ports[0]), ports[0]
+    assert re.fullmatch(r"127\.0\.0\.1:\$\{KONG_PROXY_PORT[^}]*\}:8000", ports[0]), ports[0]
+
+
+def test_dev_override_publishes_only_postgres_and_rabbitmq_on_loopback() -> None:
+    """The single opt-in development exception (deploy/README.md); never loaded by default."""
+    override = _read_compose(DEV_OVERRIDE)
+    assert set(override) == {"services"}
+    targets = {}
+    for name, block in override["services"].items():
+        assert set(block) == {"ports"}, f"{name}: the dev override may only publish ports"
+        for port in block["ports"]:
+            assert port.startswith("127.0.0.1:"), f"{name}: {port} must bind the host loopback"
+        targets[name] = {int(port.rsplit(":", 1)[1]) for port in block["ports"]}
+    assert targets == {"postgres": {5432}, "rabbitmq": {5672, 15672}}
 
 
 def test_kong_is_db_less_with_a_read_only_declarative_config(services: dict) -> None:
@@ -229,6 +243,7 @@ def test_kong_admin_api_never_listens_beyond_the_container_loopback(services: di
     assert listen == "off" or listen.startswith("127.0.0.1:"), (
         f"the Kong admin API must not be reachable from the host or the network, got {listen!r}"
     )
+    assert services["kong"]["environment"]["KONG_ADMIN_GUI_LISTEN"] == "off"
 
 
 def test_kong_declarative_config_has_a_format_version() -> None:
@@ -299,7 +314,8 @@ def test_application_service_block(services: dict, name: str) -> None:
     environment = block["environment"]
     assert environment["SERVICE_NAME"] == f"{name}-service"
     # Database per service (SAD 8.1, ADR-03): a service gets its own URL and no other.
-    assert environment["DATABASE_URL"] == f"${{{name.upper()}_DB_URL}}"
+    variable = f"{name.upper()}_DB_URL"
+    assert environment["DATABASE_URL"] == f"${{{variable}:?set {variable}}}"
     foreign = [
         f"{key}={value}"
         for key, value in environment.items()
@@ -307,7 +323,8 @@ def test_application_service_block(services: dict, name: str) -> None:
         if other != name and f"{other.upper()}_DB_" in str(value)
     ]
     assert not foreign, f"{name}-svc receives another service's database settings: {foreign}"
-    for key in ("RABBITMQ_URL", "EVENTS_EXCHANGE", "ENVIRONMENT", "LOG_LEVEL"):
+    assert environment["RABBITMQ_URL"] == "${RABBITMQ_URL:?set RABBITMQ_URL}"
+    for key in ("EVENTS_EXCHANGE", "ENVIRONMENT", "LOG_LEVEL"):
         assert environment[key] == f"${{{key}}}", f"{name}-svc: {key} must come from .env"
 
 
@@ -453,6 +470,15 @@ def test_init_script_takes_passwords_only_from_the_environment() -> None:
     # The password reaches SQL as a psql variable rendered with %L, never by shell interpolation
     # into the SQL text (the here-document is quoted, so the shell expands nothing inside it).
     assert "PASSWORD %L" in text
+    # psql reads the password itself, so it never appears in the process list.
+    assert r"\getenv pw :pw_var" in text
+    assert "pw=" not in text.replace("pw_var=", "")
+    assert "SET log_statement = 'none';" in text
+
+
+def test_init_script_validates_every_password_before_creating_anything() -> None:
+    text = INIT_SCRIPT.read_text(encoding="utf-8")
+    assert text.index("exit 1") < text.index("psql_super --dbname")
     assert text.count("<<'SQL'") == text.count("<<"), "here-documents must be quoted"
 
 
@@ -506,7 +532,9 @@ def test_docker_compose_config_validates_with_the_services_profile(services: dic
 
     publishing = {name: block["ports"] for name, block in resolved.items() if block.get("ports")}
     assert set(publishing) == {"kong"}, f"only Kong may publish a host port: {publishing}"
-    assert [port["target"] for port in publishing["kong"]] == [8000]
+    assert [(port["host_ip"], port["target"]) for port in publishing["kong"]] == [
+        ("127.0.0.1", 8000)
+    ]
 
     # The text reader above and Compose must agree, or the reader no longer covers the file.
     assert set(resolved) == set(services)
@@ -524,3 +552,18 @@ def test_docker_compose_config_validates_with_the_services_profile(services: dic
             dependency: settings["condition"]
             for dependency, settings in block["depends_on"].items()
         } == {"postgres": "service_healthy", "rabbitmq": "service_healthy"}
+
+
+def test_docker_compose_config_validates_with_the_dev_override() -> None:
+    model, stderr = _docker_compose_config("-f", "deploy/docker-compose.dev.yml")
+    assert "variable is not set" not in stderr, stderr
+    published = {
+        name: sorted((port["host_ip"], port["target"]) for port in block["ports"])
+        for name, block in model["services"].items()
+        if block.get("ports")
+    }
+    assert published == {
+        "kong": [("127.0.0.1", 8000)],
+        "postgres": [("127.0.0.1", 5432)],
+        "rabbitmq": [("127.0.0.1", 5672), ("127.0.0.1", 15672)],
+    }

@@ -3,13 +3,13 @@
 # root file explicitly:
 #   docker compose --env-file .env -f deploy/docker-compose.yml up -d
 #   docker compose --env-file .env -f deploy/docker-compose.yml --profile services up -d
-# Only Kong publishes a host port; everything else stays on the internal network (SAD 8.2, 13.1).
+# Only Kong publishes a host port (on 127.0.0.1); everything else stays on the internal network (SAD 8.2, 13.1).
 # No secrets in this file: every value comes from .env (see .env.example).
 
 name: smart-ordering
 
 x-service-env: &service-env
-  RABBITMQ_URL: ${RABBITMQ_URL}
+  RABBITMQ_URL: ${RABBITMQ_URL:?set RABBITMQ_URL}
   EVENTS_EXCHANGE: ${EVENTS_EXCHANGE}
   ENVIRONMENT: ${ENVIRONMENT}
   LOG_LEVEL: ${LOG_LEVEL}
@@ -90,8 +90,9 @@ services:
       KONG_DATABASE: "off"
       KONG_DECLARATIVE_CONFIG: /kong/declarative/kong.yml
       KONG_PROXY_LISTEN: 0.0.0.0:8000
-      # Admin API bound to the container loopback only: never reachable from the host or network.
+      # Admin API on the container loopback only; Kong Manager (admin GUI, 8002/8445) is off.
       KONG_ADMIN_LISTEN: 127.0.0.1:8001
+      KONG_ADMIN_GUI_LISTEN: "off"
       KONG_PROXY_ACCESS_LOG: /dev/stdout
       KONG_PROXY_ERROR_LOG: /dev/stderr
       KONG_ADMIN_ACCESS_LOG: /dev/stdout
@@ -99,7 +100,8 @@ services:
     volumes:
       - ../gateway/kong.yml:/kong/declarative/kong.yml:ro
     ports:
-      - "${KONG_PROXY_PORT:?set KONG_PROXY_PORT}:8000"
+      # Loopback only: the development stand-in for the Nginx edge (SAD 12.1, 12.2).
+      - "127.0.0.1:${KONG_PROXY_PORT:?set KONG_PROXY_PORT}:8000"
     networks: [internal]
     healthcheck:
       test: ["CMD", "kong", "health"]
@@ -116,7 +118,7 @@ services:
     environment:
       <<: *service-env
       SERVICE_NAME: identity-service
-      DATABASE_URL: ${IDENTITY_DB_URL}
+      DATABASE_URL: ${IDENTITY_DB_URL:?set IDENTITY_DB_URL}
 
   restaurant-svc:
     <<: *service
@@ -126,7 +128,7 @@ services:
     environment:
       <<: *service-env
       SERVICE_NAME: restaurant-service
-      DATABASE_URL: ${RESTAURANT_DB_URL}
+      DATABASE_URL: ${RESTAURANT_DB_URL:?set RESTAURANT_DB_URL}
 
   catalog-svc:
     <<: *service
@@ -136,7 +138,7 @@ services:
     environment:
       <<: *service-env
       SERVICE_NAME: catalog-service
-      DATABASE_URL: ${CATALOG_DB_URL}
+      DATABASE_URL: ${CATALOG_DB_URL:?set CATALOG_DB_URL}
 
   conversation-svc:
     <<: *service
@@ -146,8 +148,8 @@ services:
     environment:
       <<: *service-env
       SERVICE_NAME: conversation-service
-      DATABASE_URL: ${CONVERSATION_DB_URL}
-      # Synchronous dependencies (SAD 6.1).
+      DATABASE_URL: ${CONVERSATION_DB_URL:?set CONVERSATION_DB_URL}
+      # Synchronous dependencies (SAD 6.1, 8.3, 11.3); the Catalog call is the snapshot rebuild.
       ORDER_BASE_URL: http://order-svc:8000
       IDENTITY_BASE_URL: http://identity-svc:8000
       CATALOG_BASE_URL: http://catalog-svc:8000
@@ -166,7 +168,7 @@ services:
     environment:
       <<: *service-env
       SERVICE_NAME: order-service
-      DATABASE_URL: ${ORDER_DB_URL}
+      DATABASE_URL: ${ORDER_DB_URL:?set ORDER_DB_URL}
       # Prices and availability come only from Catalog (SAD 6.1, 6.4).
       CATALOG_BASE_URL: http://catalog-svc:8000
 
@@ -178,7 +180,7 @@ services:
     environment:
       <<: *service-env
       SERVICE_NAME: notification-service
-      DATABASE_URL: ${NOTIFICATION_DB_URL}
+      DATABASE_URL: ${NOTIFICATION_DB_URL:?set NOTIFICATION_DB_URL}
 
   analytics-svc:
     <<: *service
@@ -188,7 +190,7 @@ services:
     environment:
       <<: *service-env
       SERVICE_NAME: analytics-service
-      DATABASE_URL: ${ANALYTICS_DB_URL}
+      DATABASE_URL: ${ANALYTICS_DB_URL:?set ANALYTICS_DB_URL}
 
 networks:
   internal: {}
