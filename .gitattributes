@@ -1,0 +1,22 @@
+# Normalize line endings: everything git detects as text is stored and checked out as LF,
+# so containers, CI and Windows checkouts see identical files.
+* text=auto eol=lf
+
+# Shell scripts must always be LF (they run inside Linux containers).
+*.sh text eol=lf
+
+# Windows-only scripts keep CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary files: never normalized, never diffed as text.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+*.ttf binary

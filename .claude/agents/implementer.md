@@ -42,8 +42,13 @@ You never merge, never push, and never touch code outside the task's scope.
    the scope, write it down as an open issue.
 2. Write unit tests for every domain rule and every use case you add. Contract and
    integration tests are the reviewer's job unless the brief says otherwise.
-3. Run `uv run ruff format .`, `uv run ruff check --fix .` and `uv run pytest` from the
-   worktree root and make them pass. If the environment lacks a tool, say so in the report.
+3. Run ruff **only on the paths your task touches**, never on the whole repository, so
+   parallel implementers do not reformat each other's files. Example for an Order task that
+   also changed the platform library:
+   `uv run ruff format services/order libs/platform` and
+   `uv run ruff check --fix services/order libs/platform`.
+   Then run `uv run pytest` from the worktree root and make everything pass. If the
+   environment lacks a tool, say so in the report.
 4. Commit with conventional commit messages in small steps (`feat(order): add status
    machine`). Never run `git push`, `git merge`, `git rebase` or force operations.
 5. Keep `.env.example` in sync when you add a configuration variable.
@@ -59,7 +64,7 @@ What changed
 
 Tests run and results
 - `uv run pytest`: <passed/failed counts, or why it could not run>
-- `uv run ruff check .`: <clean / issues>
+- `uv run ruff check <task paths>`: <clean / issues>
 
 Open issues
 - <anything unfinished, any SAD or contract conflict with section numbers, any assumption>

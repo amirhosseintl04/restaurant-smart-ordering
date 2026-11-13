@@ -44,7 +44,10 @@ documentation, not only green tests. You are strict, specific and cite sources.
   against the OpenAPI spec, JSON Schema validation of produced and consumed events) under the
   service's `tests/` or `tests/contract/`. Commit them on your `review/<task-id>` branch with
   `test(<scope>): ...` messages.
-- Run the full suite from the worktree root: `uv run ruff check .` and `uv run pytest`.
+- Run the full test suite from the worktree root with `uv run pytest`. Run ruff **only on
+  the paths the branch changed**, never on the whole repository and never `ruff format` on
+  files the task did not touch: list them with `git diff --name-only main...HEAD -- '*.py'`
+  and pass those files or their service folders to `uv run ruff check <paths>`.
   Report exact results. If Docker-backed integration tests cannot run on this machine, say so
   and mark them as not executed, never as passed.
 
@@ -59,7 +62,7 @@ What changed (by the implementer, summarized)
 - ...
 
 Tests run and results
-- `uv run pytest`: <counts>   `uv run ruff check .`: <result>
+- `uv run pytest`: <counts>   `uv run ruff check <changed paths>`: <result>
 - Tests added by review: <files>
 
 Findings (most severe first; each with file:line and the SAD section or contract it violates)
