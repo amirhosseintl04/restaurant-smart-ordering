@@ -1,0 +1,14 @@
+# Opt-in development override; never loaded by default and never used in production.
+# The single exception to "only Kong publishes a host port" (see deploy/README.md): publishes
+# PostgreSQL and RabbitMQ on the host loopback for host-side integration tests and debugging.
+#   docker compose --env-file .env -f deploy/docker-compose.yml -f deploy/docker-compose.dev.yml up -d
+
+services:
+  postgres:
+    ports:
+      - "127.0.0.1:5432:5432"
+
+  rabbitmq:
+    ports:
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:15672:15672"

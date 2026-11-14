@@ -1,0 +1,200 @@
+# Single-VM deployment of Restaurant Smart Ordering (SAD 12.2, 12.3).
+# Run from the repository root; Compose reads .env next to this file by default, so pass the
+# root file explicitly:
+#   docker compose --env-file .env -f deploy/docker-compose.yml up -d
+#   docker compose --env-file .env -f deploy/docker-compose.yml --profile services up -d
+# Only Kong publishes a host port (on 127.0.0.1); everything else stays on the internal network (SAD 8.2, 13.1).
+# No secrets in this file: every value comes from .env (see .env.example).
+
+name: smart-ordering
+
+x-service-env: &service-env
+  RABBITMQ_URL: ${RABBITMQ_URL:?set RABBITMQ_URL}
+  EVENTS_EXCHANGE: ${EVENTS_EXCHANGE}
+  ENVIRONMENT: ${ENVIRONMENT}
+  LOG_LEVEL: ${LOG_LEVEL}
+
+# Shared settings of the seven application services. They start only with --profile services;
+# each skeleton task adds services/<name>/Dockerfile and never edits this file.
+x-service: &service
+  profiles: [services]
+  expose: ["8000"]
+  networks: [internal]
+  depends_on:
+    postgres:
+      condition: service_healthy
+    rabbitmq:
+      condition: service_healthy
+  healthcheck:
+    # Standard library only: slim Python images have no curl. Non-2xx raises, so exit code 1.
+    test:
+      - CMD
+      - python
+      - -c
+      - "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/ready', timeout=3)"
+    interval: 10s
+    timeout: 5s
+    retries: 5
+    start_period: 20s
+
+services:
+  postgres:
+    # PostgreSQL 16 with pgvector; pg_trgm ships with contrib (SAD 8.1, 12.1).
+    image: pgvector/pgvector:0.8.1-pg16
+    environment:
+      POSTGRES_USER: ${POSTGRES_SUPERUSER:?set POSTGRES_SUPERUSER}
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:?set POSTGRES_SUPERUSER_PASSWORD}
+      POSTGRES_DB: postgres
+      IDENTITY_DB_PASSWORD: ${IDENTITY_DB_PASSWORD:?set IDENTITY_DB_PASSWORD}
+      RESTAURANT_DB_PASSWORD: ${RESTAURANT_DB_PASSWORD:?set RESTAURANT_DB_PASSWORD}
+      CATALOG_DB_PASSWORD: ${CATALOG_DB_PASSWORD:?set CATALOG_DB_PASSWORD}
+      CONVERSATION_DB_PASSWORD: ${CONVERSATION_DB_PASSWORD:?set CONVERSATION_DB_PASSWORD}
+      ORDER_DB_PASSWORD: ${ORDER_DB_PASSWORD:?set ORDER_DB_PASSWORD}
+      NOTIFICATION_DB_PASSWORD: ${NOTIFICATION_DB_PASSWORD:?set NOTIFICATION_DB_PASSWORD}
+      ANALYTICS_DB_PASSWORD: ${ANALYTICS_DB_PASSWORD:?set ANALYTICS_DB_PASSWORD}
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    networks: [internal]
+    healthcheck:
+      # TCP on purpose: during first-start init the server listens only on the local socket.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U \"$${POSTGRES_USER}\" -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  rabbitmq:
+    # RabbitMQ 3.13 with the management plugin (SAD 7.3, ADR-05). Exchanges and queues are
+    # declared by the services through libs/platform (I1-03), not here.
+    image: rabbitmq:3.13.7-management
+    # A fixed hostname keeps the node name, so mq-data survives container recreation.
+    hostname: rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:?set RABBITMQ_DEFAULT_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:?set RABBITMQ_DEFAULT_PASS}
+    volumes:
+      - mq-data:/var/lib/rabbitmq
+    networks: [internal]
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  kong:
+    # Kong Gateway open source, DB-less, declarative config from gateway/kong.yml (ADR-06).
+    image: kong:3.9.1
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /kong/declarative/kong.yml
+      KONG_PROXY_LISTEN: 0.0.0.0:8000
+      # Admin API on the container loopback only; Kong Manager (admin GUI, 8002/8445) is off.
+      KONG_ADMIN_LISTEN: 127.0.0.1:8001
+      KONG_ADMIN_GUI_LISTEN: "off"
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+    volumes:
+      - ../gateway/kong.yml:/kong/declarative/kong.yml:ro
+    ports:
+      # Loopback only: the development stand-in for the Nginx edge (SAD 12.1, 12.2).
+      - "127.0.0.1:${KONG_PROXY_PORT:?set KONG_PROXY_PORT}:8000"
+    networks: [internal]
+    healthcheck:
+      test: ["CMD", "kong", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  identity-svc:
+    <<: *service
+    build:
+      context: ..
+      dockerfile: services/identity/Dockerfile
+    environment:
+      <<: *service-env
+      SERVICE_NAME: identity-service
+      DATABASE_URL: ${IDENTITY_DB_URL:?set IDENTITY_DB_URL}
+
+  restaurant-svc:
+    <<: *service
+    build:
+      context: ..
+      dockerfile: services/restaurant/Dockerfile
+    environment:
+      <<: *service-env
+      SERVICE_NAME: restaurant-service
+      DATABASE_URL: ${RESTAURANT_DB_URL:?set RESTAURANT_DB_URL}
+
+  catalog-svc:
+    <<: *service
+    build:
+      context: ..
+      dockerfile: services/catalog/Dockerfile
+    environment:
+      <<: *service-env
+      SERVICE_NAME: catalog-service
+      DATABASE_URL: ${CATALOG_DB_URL:?set CATALOG_DB_URL}
+
+  conversation-svc:
+    <<: *service
+    build:
+      context: ..
+      dockerfile: services/conversation/Dockerfile
+    environment:
+      <<: *service-env
+      SERVICE_NAME: conversation-service
+      DATABASE_URL: ${CONVERSATION_DB_URL:?set CONVERSATION_DB_URL}
+      # Synchronous dependencies (SAD 6.1, 8.3, 11.3); the Catalog call is the snapshot rebuild.
+      ORDER_BASE_URL: http://order-svc:8000
+      IDENTITY_BASE_URL: http://identity-svc:8000
+      CATALOG_BASE_URL: http://catalog-svc:8000
+      # LLM and embeddings behind LLMProvider / EmbeddingProvider (SAD 9.7).
+      LLM_API_BASE: ${LLM_API_BASE}
+      LLM_API_KEY: ${LLM_API_KEY}
+      LLM_MODEL: ${LLM_MODEL}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL}
+      LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS}
+
+  order-svc:
+    <<: *service
+    build:
+      context: ..
+      dockerfile: services/order/Dockerfile
+    environment:
+      <<: *service-env
+      SERVICE_NAME: order-service
+      DATABASE_URL: ${ORDER_DB_URL:?set ORDER_DB_URL}
+      # Prices and availability come only from Catalog (SAD 6.1, 6.4).
+      CATALOG_BASE_URL: http://catalog-svc:8000
+
+  notification-svc:
+    <<: *service
+    build:
+      context: ..
+      dockerfile: services/notification/Dockerfile
+    environment:
+      <<: *service-env
+      SERVICE_NAME: notification-service
+      DATABASE_URL: ${NOTIFICATION_DB_URL:?set NOTIFICATION_DB_URL}
+
+  analytics-svc:
+    <<: *service
+    build:
+      context: ..
+      dockerfile: services/analytics/Dockerfile
+    environment:
+      <<: *service-env
+      SERVICE_NAME: analytics-service
+      DATABASE_URL: ${ANALYTICS_DB_URL:?set ANALYTICS_DB_URL}
+
+networks:
+  internal: {}
+
+volumes:
+  pg-data: {}
+  mq-data: {}
