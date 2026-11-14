@@ -73,8 +73,10 @@ paths:
 
         The session is identified by tenant, `channel` and `external_user_id`.
 
-        `message_id` is forwarded to Order as the `Idempotency-Key`, so resending the same
-        message never creates a second order or applies an edit twice (SAD 6.3, 11.4).
+        Conversation sends `<channel>:<external_user_id>:<message_id>` to Order as the
+        `Idempotency-Key` (a channel's message IDs are unique only within one chat), so
+        resending the same message never creates a second order or applies an edit twice
+        (SAD 6.3, 11.4).
 
         Business outcomes are answered with `200` and a Persian `reply`: an unavailable item
         or an ambiguous order becomes a clarification with quick replies (SAD 10.3), and an
@@ -254,7 +256,7 @@ components:
       type: string
       minLength: 1
       maxLength: 128
-      description: The channel's ID of this message or button press. Unique per tenant; used as the idempotency key towards Order.
+      description: The channel's ID of this message or button press; unique within one chat. Combined with `channel` and `external_user_id` it forms the idempotency key towards Order.
     ActionId:
       type: string
       enum: [accept_suggestion, decline_suggestion]

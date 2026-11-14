@@ -76,8 +76,8 @@ paths:
         status `CREATED` together with an `OrderCreated` outbox row in one transaction
         (SAD 6.3, 10.1).
 
-        Idempotent on `Idempotency-Key` per tenant (SAD 6.3): Conversation sends the chat
-        `message_id`. A repeat with the same key and the same body returns `200` with the
+        Idempotent on `Idempotency-Key` per tenant (SAD 6.3): Conversation sends
+        `<channel>:<external_user_id>:<message_id>` of the chat message. A repeat with the same key and the same body returns `200` with the
         order created the first time and publishes nothing. The same key with a different body
         is rejected with `422 idempotency-key-reused`.
 
@@ -186,8 +186,14 @@ paths:
       summary: Add, remove or change item quantities (Conversation → Order)
       description: |
         Applies all `changes` in order, atomically, to an order in status `CREATED`
-        (SAD 10.5), re-quotes the resulting items from Catalog and stores the order with an
-        `OrderUpdated` outbox row in one transaction (SAD 10.2).
+        (SAD 10.5) and stores the order with an `OrderUpdated` outbox row in one transaction
+        (SAD 10.2).
+
+        Existing lines keep their snapshotted unit price (SAD 6.4); Catalog is asked only about
+        what grows. A product new to the order is quoted for price and availability and gets
+        the quoted unit price. A quantity increase on an existing line is checked for
+        availability only and keeps the line's price. Decreases and removals need no quote.
+        So the `OrderUpdated` deltas always add up to the change in `total`.
 
         - `add`: adds the quantity; merges into the existing line if the product is already
           in the order.
@@ -334,7 +340,7 @@ components:
       name: Idempotency-Key
       in: header
       required: true
-      description: The chat `message_id` that caused the request (SAD 6.3, 11.4). Unique per tenant.
+      description: "`<channel>:<external_user_id>:<message_id>` of the chat message that caused the request, built by Conversation, because a channel's message IDs are unique only within one chat (SAD 6.3, 11.4). Unique per tenant."
       schema:
         type: string
         minLength: 1
