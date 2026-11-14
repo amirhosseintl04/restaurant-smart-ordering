@@ -218,6 +218,44 @@ guardrails or the technology stack needs a new ADR and the human's approval befo
   "Passes on main" is observable only after a push. Pinned SHAs need periodic updates.
 - **Related:** SAD 12.4, 12.5, ADR-12, ADR-14, CLAUDE.md rule 3, backlog I1-14, F1-03, F1-06.
 
+## ADR-16: I1-02 contract decisions
+
+- **Status:** Accepted, 2026-11-14
+- **Context:** The SAD is the source of truth until an ADR changes it (CLAUDE.md), and
+  contracts come first (SAD 7.4, 11.1). Writing the I1-02 contracts exposed points where the
+  SAD text is silent, inconsistent or too coarse to implement. The human approved the choices
+  below.
+- **Decision:** The contracts in `contracts/events/` and `contracts/openapi/` deliberately
+  differ from or add to the SAD as follows.
+  - A6: `Idempotency-Key` is required on `PATCH /internal/orders/{order_id}/items` as well
+    (SAD 6.3 names only order creation), so a retried edit is applied once.
+  - G1: Order consumes both `RestaurantRegistered` and `RestaurantSuspended` (SAD 7.2, 7.3).
+    The SAD 4.2 table listed only `RestaurantSuspended` and is corrected in this change.
+  - G5: the skeleton criterion "exported OpenAPI identical to the contract" becomes
+    "compatible with the contract, verified by Schemathesis" (CLAUDE.md rule 4).
+  - G6: gateway-generated errors (Kong 401, 403, 429) must also be RFC 9457 problem+json;
+    implemented in I1-13.
+  - Event additions beyond the "key data fields" of SAD 7.2: `customer_ref` on `OrderUpdated`,
+    `OrderStatusChanged` and `OrderCancelled`; optional product `name` on order lines;
+    `complements` in `MenuItemUpdated` (required by SAD 8.3); `product_id` in
+    `PromotionExpired`. Cancellation publishes `OrderCancelled` only, never
+    `OrderStatusChanged`. `MenuItemUpdated` carries no availability; availability comes only
+    from `MenuItemAvailabilityChanged`, which is also published on item creation.
+  - API additions: invalid input answers 422 `validation-error`; twelve named problem types
+    (table in `contracts/openapi/README.md`); an idempotent replay answers 200 with the first
+    result, and key reuse with another body answers 422; the Catalog price quote always
+    answers 200 and flags unavailable or unknown items, which Order turns into 409 or 422;
+    only the button actions `accept_suggestion` and `decline_suggestion` are defined in v1
+    (the other actions of SAD 9.1 come with their iteration); when Order is unreachable,
+    `POST /v1/chat/messages` answers 503 problem+json, and all business outcomes answer 200.
+- **Alternatives considered:** Following the SAD literally in each point. Cost: duplicate
+  edits on retry, Notification having to keep its own order state, and no machine-checkable
+  errors.
+- **Consequences:** Implementers follow the contracts. Open gaps are tracked as debt D1-01 to
+  D1-05 in `docs/backlog.md` (cancel endpoint, customer registration, reactivation event,
+  `total` on `OrderCancelled`, two SAD diagram arrows).
+- **Related:** SAD 4.2, 6.3, 7.2, 8.3, 9.1, 11.1 to 11.5, ADR-04, ADR-10, backlog I1-02.
+
 ---
 
 ## Template for new ADRs
