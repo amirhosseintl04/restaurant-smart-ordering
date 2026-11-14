@@ -129,5 +129,5 @@ contracts or architecture. Any architecture change must be recorded as a new ADR
 uv sync                      # create .venv with Python 3.12 and all workspace deps
 uv run ruff format <paths> && uv run ruff check --fix <paths>   # only paths your task touches
 uv run pytest                # unit + contract tests
-docker compose -f deploy/docker-compose.yml up -d   # from Iteration 1; Docker not yet installed
+docker compose --env-file .env -f deploy/docker-compose.yml up -d   # infrastructure; see deploy/README.md
 ```

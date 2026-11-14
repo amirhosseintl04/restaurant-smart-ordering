@@ -78,7 +78,7 @@ cd restaurant-smart-ordering
 cp .env.example .env          # fill in local values; .env is git-ignored
 uv sync                       # provisions Python 3.12 from .python-version (from Iteration 1)
 uv run pytest
-docker compose -f deploy/docker-compose.yml up -d   # from Iteration 1
+docker compose --env-file .env -f deploy/docker-compose.yml up -d   # infrastructure; see deploy/README.md
 ```
 
 ## License
