@@ -19,6 +19,7 @@
 | 2 | Moved to `docs/architecture/SAD.md`; repository root renamed to `restaurant-smart-ordering/` in section 12.4; ADR-12 (uv and Python 3.12 pin) added to section 14 | 2026-11-13 |
 | 3 | Section 12.4 updated to the src layout of the uv workspace members; ADR-13 (proposed) and ADR-14 (src layout) added to section 14 | 2026-11-13 |
 | 4 | Section 12.5 closing sentence refined; ADR-15 (per-member CI pipelines) added to section 14 | 2026-11-13 |
+| 5 | Section 4.2: Order consumes `RestaurantRegistered` and `RestaurantSuspended`; ADR-16 (I1-02 contract decisions) added to section 14 | 2026-11-14 |
 
 ### Table of Contents
 
@@ -232,7 +233,7 @@ Capabilities were extracted from the goals and features of the business specific
 | **Restaurant** | Tenants, subscriptions, per-restaurant API keys | Restaurants, plans, subscriptions, keys | `RestaurantRegistered`, `RestaurantSuspended` | — |
 | **Catalog** | Menu, prices, availability, promotions, complements | Items, categories, promotions, complement rules | `MenuItemUpdated`, `MenuItemAvailabilityChanged`, `PromotionActivated`, `PromotionExpired` | `RestaurantRegistered`, `RestaurantSuspended` |
 | **Conversation** | Dialogue, order extraction, RAG, suggestions | Sessions, messages, menu read model and embeddings | `SuggestionShown`, `SuggestionAccepted`, `SuggestionDeclined` | Menu and promotion events |
-| **Order** | Placing, validating, editing orders; order status | Orders, order items, status history | `OrderCreated`, `OrderUpdated`, `OrderStatusChanged`, `OrderCancelled` | `RestaurantSuspended` |
+| **Order** | Placing, validating, editing orders; order status | Orders, order items, status history | `OrderCreated`, `OrderUpdated`, `OrderStatusChanged`, `OrderCancelled` | `RestaurantRegistered`, `RestaurantSuspended` |
 | **Notification** | Sending messages to customers and staff over channels | Message templates, delivery log | — | Order events |
 | **Analytics** | Sales and suggestion-impact reports | Aggregated report tables | — | Order, suggestion and customer events |
 
@@ -1104,6 +1105,7 @@ In v1, metrics are derived from logs. Prometheus, Grafana and distributed tracin
 | ADR-13 | LLM provider for extraction and phrasing (Proposed; decided after the Iteration 0 prototype) | — | Pending measurement on the golden set (QA-AI1, QA-P1, R3) | Pending |
 | ADR-14 | src layout for every workspace member (`services/<name>/src/<name>_service/`, `libs/platform/src/platform_lib/`) | Flat layout as drawn in SAD 12.4 v1.0 | A package is importable only when installed in the workspace environment, so no accidental imports from the working directory; uv's default layout | Deeper paths; pytest runs in `importlib` import mode |
 | ADR-15 | Per-member CI pipelines with isolated environments (GitHub Actions, reusable workflow, path filters on direct inputs) | One matrix workflow with a third-party path-filter action; full root `uv sync` per job; floating action tags | Undeclared dependencies and cross-service imports fail in CI; transparent filters; pinned actions limit supply-chain risk | Image build, Compose tests and deploy deferred; pinned SHAs need periodic updates |
+| ADR-16 | I1-02 contract decisions: where contracts add to or differ from the SAD (idempotent item edits, Order consumes `RestaurantRegistered`, Schemathesis compatibility, problem+json from the gateway, event and API additions) | Following the SAD literally in each point | Retried edits apply once; Order and Notification stay consistent; errors are machine-checkable | Contracts exceed the SAD text until synced; gaps tracked as D1-01 to D1-05 |
 
 The full text of each record, with context and consequences, is maintained in `docs/decisions.md`.
 

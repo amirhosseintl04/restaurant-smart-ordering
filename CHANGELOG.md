@@ -18,3 +18,4 @@ iteration numbers from the SAD (section 17.1) until the first tagged release.
 ### Changed (Iteration 1)
 
 - ADR-15 (per-member CI pipelines with isolated environments) added to `docs/decisions.md` and SAD section 14; SAD 12.5 closing sentence refined.
+- ADR-16 (I1-02 contract decisions) added to `docs/decisions.md` and SAD section 14; SAD 4.2 now lists `RestaurantRegistered` among Order's consumed events.
