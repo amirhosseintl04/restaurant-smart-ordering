@@ -248,6 +248,13 @@ guardrails or the technology stack needs a new ADR and the human's approval befo
     only the button actions `accept_suggestion` and `decline_suggestion` are defined in v1
     (the other actions of SAD 9.1 come with their iteration); when Order is unreachable,
     `POST /v1/chat/messages` answers 503 problem+json, and all business outcomes answer 200.
+  - The `Idempotency-Key` towards Order is `<channel>:<external_user_id>:<message_id>`,
+    built by Conversation, because a channel's message IDs are unique only within one chat;
+    Order keeps it unique per tenant (SAD 6.3, 11.4).
+  - An item edit keeps the snapshotted unit price of existing lines (SAD 6.4): a product new
+    to the order is quoted for price and availability, a quantity increase on an existing
+    line is checked for availability only, decreases and removals need no quote. The
+    `OrderUpdated` deltas therefore add up to the change in `total`.
 - **Alternatives considered:** Following the SAD literally in each point. Cost: duplicate
   edits on retry, Notification having to keep its own order state, and no machine-checkable
   errors.
