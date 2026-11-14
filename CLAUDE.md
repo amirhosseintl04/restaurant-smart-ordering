@@ -102,9 +102,9 @@ not try). Only key hashes are stored; JWT keys are files outside the repo (SAD 1
 
 | Role | Model / effort | Isolation | Does | Never |
 | --- | --- | --- | --- | --- |
-| Lead (main session) | Fable, high | main checkout | Plans iterations, writes contracts, delegates, merges | Implements services itself |
+| Lead (main session) | Opus 5.5, medium | main checkout | Plans iterations, writes contracts, delegates, merges | Implements services itself |
 | `implementer` | Opus, medium | worktree | One service or task per invocation, unit tests, commits on `feat/*` | Touches other services, pushes |
-| `reviewer` | Fable, high | worktree | Reviews against SAD and contracts, writes acceptance/contract tests, runs full suite | Reviews its own code, merges |
+| `reviewer` | Opus, high (Fable for gate reviews) | worktree | Reviews against SAD and contracts, writes acceptance/contract tests, runs full suite | Reviews its own code, merges |
 | `docs-writer` | Sonnet, medium | worktree | `docs/`, READMEs, `CHANGELOG.md`, `docs/decisions.md` | Edits service, lib or contract code |
 
 Delegation rules:
@@ -112,6 +112,8 @@ Delegation rules:
 - **AI-core tasks in Conversation (retrieval, extraction, suggestion engine, prompt work) are
   delegated with `model: fable`, `effort: high`** passed on the Agent call, starting in
   Iteration 2. Skeleton and plumbing work in Conversation uses the default implementer model.
+- **Reviews run on Opus, effort high, by default.** Gate reviews (contracts, and the
+  Conversation AI core) are delegated with `model: fable` passed explicitly on the Agent call.
 - Every agent ends with the report format: what changed, tests run and results, open issues.
 - Agents read `CLAUDE.md` and the SAD sections named in their brief before coding.
 

@@ -1,7 +1,7 @@
 ---
 name: reviewer
 description: Reviews a finished feature branch against the SAD, CLAUDE.md rules and the contracts in contracts/, writes acceptance and contract tests, runs the full test suite in its own worktree on a review/<task-id> branch, and reports a merge recommendation. Use after every implementer task and before any merge to main. Never reviews code it wrote itself.
-model: fable
+model: opus
 effort: high
 isolation: worktree
 disallowedTools: Agent
