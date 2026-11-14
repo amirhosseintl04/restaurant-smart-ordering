@@ -1,0 +1,45 @@
+# CI for libs/platform (platform-lib): the library, its unit tests and every test under
+# libs/platform/tests. It also runs when the event envelope or the common schema changes,
+# because the library's envelope code follows them. Changes to other members' manifests are
+# covered by the structure workflow (structure.yml), not here.
+name: platform
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "libs/platform/**"
+      - "contracts/events/envelope.schema.json"
+      - "contracts/events/common.schema.json"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".python-version"
+      - ".github/workflows/platform.yml"
+      - ".github/workflows/_member-ci.yml"
+      - ".github/scripts/sync-member.sh"
+  pull_request:
+    paths:
+      - "libs/platform/**"
+      - "contracts/events/envelope.schema.json"
+      - "contracts/events/common.schema.json"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".python-version"
+      - ".github/workflows/platform.yml"
+      - ".github/workflows/_member-ci.yml"
+      - ".github/scripts/sync-member.sh"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    uses: ./.github/workflows/_member-ci.yml
+    with:
+      member-path: libs/platform
+      package: platform-lib

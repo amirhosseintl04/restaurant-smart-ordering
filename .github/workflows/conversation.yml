@@ -1,0 +1,44 @@
+# CI for the conversation service: runs only when its inputs change (SAD 12.5).
+name: conversation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "services/conversation/**"
+      - "libs/platform/**"
+      - "contracts/openapi/conversation.yaml"
+      - "contracts/events/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".python-version"
+      - ".github/workflows/conversation.yml"
+      - ".github/workflows/_member-ci.yml"
+      - ".github/scripts/sync-member.sh"
+  pull_request:
+    paths:
+      - "services/conversation/**"
+      - "libs/platform/**"
+      - "contracts/openapi/conversation.yaml"
+      - "contracts/events/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".python-version"
+      - ".github/workflows/conversation.yml"
+      - ".github/workflows/_member-ci.yml"
+      - ".github/scripts/sync-member.sh"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    uses: ./.github/workflows/_member-ci.yml
+    with:
+      member-path: services/conversation
+      package: conversation-service

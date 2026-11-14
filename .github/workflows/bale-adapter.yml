@@ -1,0 +1,40 @@
+# CI for the Bale channel adapter (adapters/bale): runs only when its inputs change (SAD 12.5).
+name: bale-adapter
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "adapters/bale/**"
+      - "libs/platform/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".python-version"
+      - ".github/workflows/bale-adapter.yml"
+      - ".github/workflows/_member-ci.yml"
+      - ".github/scripts/sync-member.sh"
+  pull_request:
+    paths:
+      - "adapters/bale/**"
+      - "libs/platform/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".python-version"
+      - ".github/workflows/bale-adapter.yml"
+      - ".github/workflows/_member-ci.yml"
+      - ".github/scripts/sync-member.sh"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    uses: ./.github/workflows/_member-ci.yml
+    with:
+      member-path: adapters/bale
+      package: bale-adapter
