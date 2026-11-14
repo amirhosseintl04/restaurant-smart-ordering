@@ -18,6 +18,7 @@
 | 1 | Initial architecture document | 2026-11-13 |
 | 2 | Moved to `docs/architecture/SAD.md`; repository root renamed to `restaurant-smart-ordering/` in section 12.4; ADR-12 (uv and Python 3.12 pin) added to section 14 | 2026-11-13 |
 | 3 | Section 12.4 updated to the src layout of the uv workspace members; ADR-13 (proposed) and ADR-14 (src layout) added to section 14 | 2026-11-13 |
+| 4 | Section 12.5 closing sentence refined; ADR-15 (per-member CI pipelines) added to section 14 | 2026-11-13 |
 
 ### Table of Contents
 
@@ -1035,7 +1036,7 @@ Every service, adapter and library is a uv workspace member with its own `pyproj
 5. Integration tests with Docker Compose
 6. Deploy after manual approval, then a smoke test
 
-A pipeline runs only when that service's folder changes; changing one service never requires rebuilding or redeploying the others.
+A service's pipeline runs when its folder or one of its direct inputs changes (the platform library, its contracts, the root manifest and lock file, the CI definition); a light structure check also runs on any workspace change; changing one service never runs, rebuilds or redeploys another service's pipeline (ADR-15).
 
 ### 12.6. Scalability
 
@@ -1102,6 +1103,7 @@ In v1, metrics are derived from logs. Prometheus, Grafana and distributed tracin
 | ADR-12 | uv as dependency and environment manager; Python pinned to 3.12 via `.python-version` | pip + venv with requirements files, Poetry, PDM | One lock file for the monorepo workspace, fast installs in CI, local interpreter matches the container image | One more tool to install on every developer machine and in CI |
 | ADR-13 | LLM provider for extraction and phrasing (Proposed; decided after the Iteration 0 prototype) | — | Pending measurement on the golden set (QA-AI1, QA-P1, R3) | Pending |
 | ADR-14 | src layout for every workspace member (`services/<name>/src/<name>_service/`, `libs/platform/src/platform_lib/`) | Flat layout as drawn in SAD 12.4 v1.0 | A package is importable only when installed in the workspace environment, so no accidental imports from the working directory; uv's default layout | Deeper paths; pytest runs in `importlib` import mode |
+| ADR-15 | Per-member CI pipelines with isolated environments (GitHub Actions, reusable workflow, path filters on direct inputs) | One matrix workflow with a third-party path-filter action; full root `uv sync` per job; floating action tags | Undeclared dependencies and cross-service imports fail in CI; transparent filters; pinned actions limit supply-chain risk | Image build, Compose tests and deploy deferred; pinned SHAs need periodic updates |
 
 The full text of each record, with context and consequences, is maintained in `docs/decisions.md`.
 
